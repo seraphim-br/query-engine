@@ -1,0 +1,22 @@
+
+obj // objeto consulta
+k // quantidade de resultado da consulta
+result // resposta da consulta
+heapQuali // nó da Mtree a serem verificados
+maiorDist<-infinito // maior distancia em resultado
+
+enquanto !heapQuali.empty()
+  MtreeNode node <- heapQuali.pop()
+  se(node->type == MtreeIndex)
+    para cada entrada em node
+	  se  dist(entrada, obj) - 
+	      entrada.coverage <= maiorDist
+        heapQuali.pull(entrada)
+	else
+      //MtreeLeaf
+      para cada entrada em node
+        se dist(entrada, obj) <= maiorDist
+          result.add(entrada)
+		  se result.size > k
+            result.removeUltimos()
+			maiorDist<-result.lastDistance()
