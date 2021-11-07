@@ -84,7 +84,7 @@ public:
 //----------------------------------------------------------------------
 
 template <typename K>
-Bool RTreeIndex<K>::addKey(K * key, Double dist, Long subPageId, Double covRad) {
+Bool RTreeIndex<K>::addKey(K * key, Long subPageId) {
     Int total = this->readNumberOfKeys();
 
     Int size = key->sizeOfKey();
@@ -108,7 +108,7 @@ Bool RTreeIndex<K>::addKey(K * key, Double dist, Long subPageId, Double covRad) 
 //----------------------------------------------------------------------
 
 template <typename K>
-Bool RTreeIndex<K>::addKey(K * key1, Double dist1, Long subPageId1, Double covRad1, K * key2, Double dist2, Long subPageId2, Double covRad2) {
+Bool RTreeIndex<K>::addKey(K * key1, Long subPageId1, K * key2, Long subPageId2) {
     Int sizeKey1 = key1->sizeOfKey();
     Int sizeKey2 = key2->sizeOfKey();
 
@@ -135,7 +135,7 @@ Double RTreeIndex<K>::distanceToQualify(Int idx, K * insertKey) {
 //----------------------------------------------------------------------
 
 template <typename K>
-Int RTreeIndex<K>::indexOfInsertion(K * key) {
+Int RTreeIndex<K>::indexOfInsertion(K * key, EuclideanGeometry<K> * geometry) {
     Double distIn = DBL_MAX; // Minimum distance if key is inside some obj covering radius.
     Double distOut = DBL_MAX; // Minimum distance if key is outside some obj covering radius.
     Double newCoverage = DBL_MAX;

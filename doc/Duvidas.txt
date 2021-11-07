@@ -1,0 +1,3 @@
+Rectangle deve extender de Euclidean Geometry ou de Metric mesmo?
+As definições "virtual" de Rectangle.h estão corretas?
+Devemos ter uma classe RTree?
