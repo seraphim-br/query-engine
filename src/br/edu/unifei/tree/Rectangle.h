@@ -24,60 +24,30 @@ namespace tree {
 
 using namespace std;
 
-class Rectangle : public Metric<Rectangle> {
-private:
-	Uuid * uuid;
-	Float extensionLatitude;
-	Float extensionLongitude;
-	Float latitude;
-	Float longitude;
-	Double preservedDistance;
-
+template <typename K>
+class Rectangle : public Metric<K> {
 public:
-	Rectangle();
+	Rectangle() {
+		static_assert(is_base_of<Rectangle<K>, K>::value, "Generic type is not derived of the Rectangle class");
+	}
 
-	virtual ~Rectangle();
+	template <typename U>
+	operator Rectangle<U>* () const {
+		return NULL;
+	}
 
-    Double getExtension(Int axis) {
-    	if (axis == 0) {
-    		return extensionLatitude;
-    	} else {
-    		return extensionLongitude;
-    	}
-    }
-    Double getOrigin(Int axis) {
-    	if (axis == 0) {
-    		return latitude;
-    	} else {
-    		return longitude;
-    	}
-    }
-    Int numberOfDimensions() {
-    	return 2;
-    }
-    void setExtension(Int axis, Double value) {
-    	if (axis == 0) {
-    		extensionLatitude = value;
-    	} else {
-    		extensionLongitude = value;
-    	}
-    }
-    void setOrigin(Int axis, Double value) {
-    	if (axis == 0) {
-    		latitude = value;
-    	} else {
-    		longitude = value;
-    	}
-    }
-
-    Double distanceTo(Rectangle *obj);
-
-	Bool pullKey(Byte array[], Int position);
-
-	void pushKey(Byte array[], Int position);
-
-	Int sizeOfKey();
+	virtual ~Rectangle() = 0;
+	virtual Double getExtension(Int axis) = 0;
+	virtual Double getOrigin(Int axis) = 0;
+	virtual Int numberOfDimensions() = 0;
+	virtual void setOrigin(Int axis, Double value) = 0;
+	virtual void setExtension(Int axis, Double value) = 0;
 };
+
+template <typename K>
+inline Rectangle<K>::~Rectangle() {
+
+}
 } /* namespace tree */
 } /* namespace unifei */
 } /* namespace edu */

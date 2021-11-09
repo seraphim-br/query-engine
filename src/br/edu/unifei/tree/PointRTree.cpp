@@ -1,11 +1,11 @@
 /*
- * Rectangle.cpp
+ * PointRTree.cpp
  *
  *  Created on: 25 de set de 2019
  *      Author: windows
  */
 
-#include <br/edu/unifei/tree/Rectangle.h>
+#include <br/edu/unifei/tree/PointRTree.h>
 #include <br/edu/unifei/tree/PullStream.h>
 #include <br/edu/unifei/tree/PushStream.h>
 
@@ -21,7 +21,7 @@ namespace tree {
 using namespace std;
 
 
-Rectangle::Rectangle() {
+PointRTree::PointRTree() {
 	// TODO Auto-generated constructor stub
 	this->latitude = 0;
 	this->longitude = 0;
@@ -32,13 +32,13 @@ Rectangle::Rectangle() {
 }
 //----------------------------------------------------------------------
 
-Rectangle::~Rectangle() {
+PointRTree::~PointRTree() {
 	// TODO Auto-generated destructor stub
 	delete uuid;
 }
 //----------------------------------------------------------------------
 
-Double Rectangle::distanceTo(Rectangle *obj){
+Double PointRTree::distanceTo(PointRTree *obj){
 	Bool isOverlaped = true;
 	for (int i = 0; i < 2; i++) {
 		if (this->getOrigin(i) >
@@ -62,7 +62,7 @@ Double Rectangle::distanceTo(Rectangle *obj){
 }
 
 //----------------------------------------------------------------------
-Bool Rectangle::pullKey(Byte array[], Int position){
+Bool PointRTree::pullKey(Byte array[], Int position){
 	PullStream pull(array, position);
 	this->latitude = pull.pullFloat();
 	this->longitude = pull.pullFloat();
@@ -72,7 +72,7 @@ Bool Rectangle::pullKey(Byte array[], Int position){
 }
 //----------------------------------------------------------------------
 
-void Rectangle::pushKey(Byte array[], Int position){
+void PointRTree::pushKey(Byte array[], Int position){
 	PushStream push(array, position);
 	push.pushFloat(this->latitude);
 	push.pushFloat(this->longitude);
@@ -81,7 +81,7 @@ void Rectangle::pushKey(Byte array[], Int position){
 }
 //----------------------------------------------------------------------
 
-Int Rectangle::sizeOfKey(){
+Int PointRTree::sizeOfKey(){
 	return Stream::sizeOfFloat + Stream::sizeOfFloat + Stream::sizeOfFloat + Stream::sizeOfFloat;
 }
 

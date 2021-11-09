@@ -29,10 +29,9 @@ or visit <http://www.gnu.org/licenses/>
 
 #include <br/edu/unifei/tree/AveragePerformance.h>
 #include <br/edu/unifei/tree/RTreeDescriptor.h>
-#include <br/edu/unifei/tree/Qualify.h>
 #include <br/edu/unifei/tree/Session.h>
 #include <br/edu/unifei/tree/Workspace.h>
-//#include <br/edu/unifei/tree/RTreePromotion.h>
+#include <br/edu/unifei/tree/RTreePromotion.h>
 #include <br/edu/unifei/tree/RTreeLeaf.h>
 #include <br/edu/unifei/tree/RTreeIndex.h>
 #include <br/edu/unifei/tree/Metric.h>
@@ -49,16 +48,7 @@ using namespace br::edu::unifei::tree;
 template <typename K>
 class RTree {
 private:
-	class QualifyComparable{
-	public:
-		bool operator() (Qualify * o1, Qualify * o2) {
-			return o1->getDistanceParentToPointQuery() > o2->getDistanceParentToPointQuery();
-		}
-	};
-
 	Workspace * workspace;
-
-	//teste
 
     AveragePerformance * averageForAdd;
     AveragePerformance * averageForFind;
@@ -88,13 +78,13 @@ public:
         return averageForFind;
     }//getAverageForFind
 
-    Workspace * getWorkspace();
+    Workspace * getWorkspace() {
+    	return this->workspace;
+    }
 
     Long getRootPageId();
 
     Bool remove(K * key);
-
-    void bfs();
 
     Int height();
 
