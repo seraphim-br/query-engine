@@ -31,9 +31,7 @@ private:
     const Double precisionError; //incrementa nona casa
 
 public:
-	EuclideanGeometry() : calculatedOverlap(0), precisionError(0.00000001){
-		static_assert(is_base_of<Rectangle<K>, K>::value, "Generic type is not derived of the Rectangle class");
-	}
+	EuclideanGeometry() : calculatedOverlap(0), precisionError(0.00000001){ }
 
 	virtual ~EuclideanGeometry(){
 	}

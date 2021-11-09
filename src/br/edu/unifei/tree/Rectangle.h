@@ -7,12 +7,13 @@
  * @author Carlos Eduardo dos Santos Pereira <eduardocarlos@unifei.edu.br>
  * @author Leandro Moraes Barbosa <lmoraesbarbosa@unifei.edu.br> */
 
-#ifndef BR_EDU_UNIFEI_TREE_METRIC_H_
-#define BR_EDU_UNIFEI_TREE_METRIC_H_
+#ifndef BR_EDU_UNIFEI_TREE_RECTANGLE_H_
+#define BR_EDU_UNIFEI_TREE_RECTANGLE_H_
 
 #include <br/edu/unifei/tree/Types.h>
 
 #include <br/edu/unifei/tree/Metric.h>
+#include <br/edu/unifei/tree/Uuid.h>
 #include <type_traits>
 #include <cstddef>
 
@@ -23,34 +24,63 @@ namespace tree {
 
 using namespace std;
 
-template <typename K>
-class Rectangle : public Metric <K>{
+class Rectangle : public Metric<Rectangle> {
+private:
+	Uuid * uuid;
+	Float extensionLatitude;
+	Float extensionLongitude;
+	Float latitude;
+	Float longitude;
+	Double preservedDistance;
+
 public:
-	Rectangle() {
-		static_assert(is_base_of<Rectangle<K>, K>::value, "Generic type is not derived of the Rectangle class");
-	}
+	Rectangle();
 
-	template <typename U>
-	operator Rectangle<U>* () const {
-		return NULL;
-	}
+	virtual ~Rectangle();
 
-	virtual ~Rectangle() = 0;
-    virtual Double getExtension(Int axis) = 0;
-    virtual Double getOrigin(Int axis) = 0;
-    virtual Int numberOfDimensions() = 0;
-    virtual void setExtension(Int axis, Double value) = 0;
-    virtual void setOrigin(Int axis, Double value) = 0;
+    Double getExtension(Int axis) {
+    	if (axis == 0) {
+    		return extensionLatitude;
+    	} else {
+    		return extensionLongitude;
+    	}
+    }
+    Double getOrigin(Int axis) {
+    	if (axis == 0) {
+    		return latitude;
+    	} else {
+    		return longitude;
+    	}
+    }
+    Int numberOfDimensions() {
+    	return 2;
+    }
+    void setExtension(Int axis, Double value) {
+    	if (axis == 0) {
+    		extensionLatitude = value;
+    	} else {
+    		extensionLongitude = value;
+    	}
+    }
+    void setOrigin(Int axis, Double value) {
+    	if (axis == 0) {
+    		latitude = value;
+    	} else {
+    		longitude = value;
+    	}
+    }
+
+    Double distanceTo(Rectangle *obj);
+
+	Bool pullKey(Byte array[], Int position);
+
+	void pushKey(Byte array[], Int position);
+
+	Int sizeOfKey();
 };
-
-template <typename K>
-inline Rectangle<K>::~Rectangle() {
-
-}
-
 } /* namespace tree */
 } /* namespace unifei */
 } /* namespace edu */
 } /* namespace br */
 
-#endif /* BR_EDU_UNIFEI_TREE_METRIC_H_ */
+#endif /* BR_EDU_UNIFEI_TREE_RECTANGLE_H_ */
