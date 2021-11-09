@@ -58,6 +58,8 @@ private:
 
 	Workspace * workspace;
 
+	//teste
+
     AveragePerformance * averageForAdd;
     AveragePerformance * averageForFind;
 
