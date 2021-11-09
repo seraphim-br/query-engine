@@ -28,6 +28,7 @@ or visit <http://www.gnu.org/licenses/>
 #include <cfloat>
 
 #include <br/edu/unifei/tree/AveragePerformance.h>
+#include <br/edu/unifei/tree/EuclideanGeometry.h>
 #include <br/edu/unifei/tree/RTreeDescriptor.h>
 #include <br/edu/unifei/tree/Session.h>
 #include <br/edu/unifei/tree/Workspace.h>
@@ -49,6 +50,8 @@ template <typename K>
 class RTree {
 private:
 	Workspace * workspace;
+
+	EuclideanGeometry<K> * geometry;
 
     AveragePerformance * averageForAdd;
     AveragePerformance * averageForFind;
@@ -102,6 +105,7 @@ RTree<K>::RTree(Workspace *workspace) {
     static_assert(is_base_of<Metric<K>, K>::value, "Generic type is not derived of the Metric class");
     averageForAdd = new AveragePerformance();
     averageForFind = new AveragePerformance();
+    geometry = new EuclideanGeometry<K>();
     this->workspace = workspace;
     Session * se = this->workspace->openSession();
     Long pageIdDescriptor = se->findPageIdDescriptor(RTreeDescriptor::nodeType);
@@ -118,6 +122,7 @@ template <typename K>
 RTree<K>::~RTree() {
     delete averageForAdd;
     delete averageForFind;
+    delete geometry;
 }//~RTree
 
 //----------------------------------------------------------------------
