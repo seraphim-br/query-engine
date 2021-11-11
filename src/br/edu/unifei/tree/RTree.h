@@ -56,9 +56,9 @@ private:
     AveragePerformance * averageForAdd;
     AveragePerformance * averageForFind;
 
-    RTreePromotion<K> * splitIndex(Session * se, RTreeIndex<K> * fullIndex,
-            K * firstKey, Long firstSubId, Double firstCov, 
-            K * secondKey, Long secondSubId, Double secondCov);
+    RTreePromotion<K> * splitIndex(Session * se,
+            RTreeIndex<K> * fullIndex, RTreeIndex<K> * newIndex,
+            K * Key, Long subId);
 
     RTreePromotion<K> * splitLeaf(Session * se, RTreeLeaf<K> * fullLeaf, K * key, Uuid * uuid);
 
@@ -334,124 +334,131 @@ Bool RTree<K>::remove(K * key) {
 
 template <typename K>
 RTreePromotion<K> * RTree<K>::splitIndex(Session * se,
-        RTreeIndex<K> * fullIndex,
-        K * firstKey, Long firstSubId, Double firstCov,
-        K * secondKey, Long secondSubId, Double secondCov) {
-    Int i, k1, k2;
-    Long nextPageId;
-    double dist1, dist2;
-    bool failAddKey;
-    Int total = fullIndex->readNumberOfKeys() + 2;
+        RTreeIndex<K> * fullIndex, RTreeIndex<K> * newIndex,
+        K * key, Long subId) {
+    Int i, j;
+//    Long nextPageId;
+//    double dist1, dist2;
+//    bool failAddKey;
+    Int total = fullIndex->readNumberOfKeys() + 1;
+
+    K ** vecKey = new K*[total];
+	Long * vecSub = new Long[total];
+    for (i = 0; i < total - 1; i++) {
+    	vecSub[i] = fullIndex->buildKey(i);
+    	vecSub[i] = fullIndex->readSubPageId(i);
+	}//endfor
+    vecKey[i] = key;
+	vecSub[i] = subId;
+
     RTreePromotion<K> * objPromote = NULL;
-    RTreeIndex<K> * newIndex = new RTreeIndex<K>(se->create());
-    RTreeIndex<K> * nextIndex;
-    K * objRep1;
-    K * objRep2;
-    Byte * serialRep1;
-    Byte * serialRep2;
+    Double ocup = -1.0; //d
 
-    //copy orded of keys and subPageId
-    K ** vectKey = new K*[total];
-    Long * vectSub = new Long[total + 1];
-    double * vectCoverage = new double[total];
-    //coping key and subPageId
-    for (i = 0; i < total - 2; i++) {
-        vectKey[i] = fullIndex->buildKey(i);
-        vectSub[i] = fullIndex->readSubPageId(i);
-        vectCoverage[i] = fullIndex->readCoveringRadius(i);
-    }//endfor
-    //copy key, subPageId and coverage
-    vectKey[i] = firstKey;
-    vectSub[i] = firstSubId;
-    vectCoverage[i] = firstCov;
-    vectKey[i + 1] = secondKey;
-    vectSub[i + 1] = secondSubId;
-    vectCoverage[i + 1] = secondCov;
+    Double d;
+	Int idx1 = 0, idx2 = 1;
 
-    do {
-        k1 = rand() % total;
-        do {
-            k2 = rand() % total;
-        } while (k1 == k2);
-        //zering
-        fullIndex->clear();
-        newIndex->clear();
-        //choose promotion
-        failAddKey = false;
+	for (i = 0; i < total - 1; i++) // Quadratic Split
+	{
+		for (j = i + 1; j < total; j++) {
+			K * mbrUnion = geometry->unionRectangles(vecKey[i], vecKey[j]);
+			// Calc Dead space: union(mbr1, mbr2) - (mbr1 + mbr2 - intersec(mbr1, mbr2))
+			d = geometry->occupancy(mbrUnion)
+					- (geometry->occupancy(vecKey[i])
+					+ geometry->occupancy(vecKey[j]));
 
-        //copy representative 1
-        objRep1 = new K();
-        serialRep1 = new Byte[vectKey[k1]->sizeOfKey()];
-        vectKey[k1]->pushKey(serialRep1, 0);
-        objRep1->pullKey(serialRep1, 0);
-        //copy representative 2
-        objRep2 = new K();
-        serialRep2 = new Byte[vectKey[k2]->sizeOfKey()];
-        vectKey[k2]->pushKey(serialRep2, 0);
-        objRep2->pullKey(serialRep2, 0);
+			if (d > ocup) {
+				ocup = d;
+				idx1 = i;
+				idx2 = j;
+			}
+		}
+	}
 
-        objPromote = new RTreePromotion<K>(objRep1, 0, fullIndex->getPageId(), objRep2, 0, newIndex->getPageId());
+	//cleanning fullIndex and inserting vecKey[idx1]
+	fullIndex->clear();
+	fullIndex->addKey(vecKey[idx1], vecSub[idx1]);
 
-        //distributing keys
-        for (i = 0; i < total; i++) {
-            averageForAdd->incrementVerification(2);
-            dist1 = objPromote->getFirstKey()->distanceTo(vectKey[i]);
-            dist2 = objPromote->getSecondKey()->distanceTo(vectKey[i]);
-            if (dist1 < dist2) {
-                if (fullIndex->addKey(vectKey[i], dist1, vectSub[i], vectCoverage[i])) {
-                    //adjusting covering radius of the promoted Key1
-                    if (objPromote->getFirstCoveringRadius() < (dist1 + vectCoverage[i])) {
-                        objPromote->setFirstCoveringRadius(dist1 + vectCoverage[i]);
-                    }
-                } else {
-                    failAddKey = true;
-                    break;
-                }
-            } else {
-                if (newIndex->addKey(vectKey[i], dist2, vectSub[i], vectCoverage[i])) {
-                    //adjusting covering radius of the promoted Key2
-                    if (objPromote->getSecondCoveringRadius() < (dist2 + vectCoverage[i])) {
-                        objPromote->setSecondCoveringRadius(dist2 + vectCoverage[i]);
-                    }
-                } else {
-                    failAddKey = true;
-                    break;
-                }
-            }
-        }//endfor
-        //clean home
-        delete [] serialRep1;
-        delete [] serialRep2;
-        if(failAddKey){
-            //deleting objPromote(objRep1, objRep2)
-            delete objPromote;
-        }
-    } while (failAddKey);
+	//cleanning newIndex and inserting vecKey[idx2]
+//	RTreeIndex<K> * newIndex = new RTreeIndex<K>(se->create());
+	newIndex->clear();
+	newIndex->addKey(vecKey[idx2], vecSub[idx2]);
+
+	//promoted MBR
+	objPromote = new RTreePromotion<K>(vecKey[idx1], fullIndex->getPageId(), vecKey[idx2], newIndex->getPageId());
+	for (i = 0; i < total; i++) {
+		if (!(i == idx1 || i == idx2)) {
+			K * union1 = geometry->unionRectangles(objPromote->getFirstKey(), vecKey[i]);
+			double ocup1 = geometry->occupancy(union1) - geometry->occupancy(objPromote->getFirstKey());
+			K * union2 = geometry->unionRectangles(objPromote->getSecondKey(), vecKey[i]);
+			double ocup2 = geometry->occupancy(union2) - geometry->occupancy(objPromote->getSecondKey());
+
+			if (ocup1 < ocup2) {
+				if (!fullIndex->addKey(vecKey[i], vecSub[i])) {
+					throw new runtime_error("add fail");
+				}
+				objPromote->setFirstKey(union1);
+			} else if (ocup1 > ocup2) {
+				if (!newIndex->addKey(vecKey[i], vecSub[i])) {
+					throw new runtime_error("add fail");
+				}
+				objPromote->setSecondKey(union2);
+			} else {
+				double ocupProm1 = geometry->occupancy(objPromote->getFirstKey());
+				double ocupProm2 = geometry->occupancy(objPromote->getSecondKey());
+				if (ocupProm1 < ocupProm2) {
+					if (!fullIndex->addKey(vecKey[i], vecSub[i])) {
+						throw new runtime_error("add fail");
+					}
+					objPromote->setFirstKey(union1);
+				} else if (ocupProm1 > ocupProm2) {
+					if (!newIndex->addKey(vecKey[i], vecSub[i])) {
+						throw new runtime_error("add fail");
+					}
+					objPromote->setSecondKey(union2);
+				} else {
+					double dist1 = objPromote->getFirstKey().distanceTo(vecKey[i]);
+					double dist2 = objPromote->getSecondKey().distanceTo(vecKey[i]);
+
+					if (dist1 < dist2) {
+						if (!fullIndex->addKey(vecKey[i], vecSub[i])) {
+							throw new runtime_error("add fail");
+						}
+						objPromote->setFirstKey(union1);
+					} else if (dist1 > dist2) {
+						if (!newIndex->addKey(vecKey[i], vecSub[i])) {
+							throw new runtime_error("add fail");
+						}
+						objPromote->setSecondKey(union2);
+					} else if (fullIndex->readNumberOfKeys() <= newIndex->readNumberOfKeys()) {
+						if (!fullIndex->addKey(vecKey[i], vecSub[i])) {
+							throw new runtime_error("add fail");
+						}
+						objPromote->setFirstKey(union1);
+					} else {
+						if (!newIndex->addKey(vecKey[i], vecSub[i])) {
+							throw runtime_error("add fail");
+						}
+						objPromote->setSecondKey(union2);
+					}
+				}
+			}
+		}
+	}
+
 
     // Circularly linked list
     newIndex->writeNextPageId(fullIndex->readNextPageId());
     fullIndex->writeNextPageId(newIndex->getPageId());
     newIndex->writePreviousPageId(fullIndex->getPageId());
-    nextPageId = newIndex->readNextPageId();
+    Long nextPageId = newIndex->readNextPageId();
     if (nextPageId != fullIndex->getPageId()) {
-        nextIndex = new RTreeIndex<K>(se->load(nextPageId));
+    	RTreeIndex<K> nextIndex = new RTreeIndex<K>(se->load(nextPageId));
         nextIndex->writePreviousPageId(newIndex->getPageId());
-        averageForAdd->incrementVerification(nextIndex->getCalculatedDistance());
-        delete nextIndex;
+//        averageForAdd->incrementVerification(nextIndex->getCalculatedDistance());
+//        delete nextIndex; //nao sei
     } else {
         fullIndex->writePreviousPageId(newIndex->getPageId());
     }
-    //ajusting Covering Radius
-    objPromote->setFirstCoveringRadius(objPromote->getFirstCoveringRadius() + precisionError);
-    objPromote->setSecondCoveringRadius(objPromote->getSecondCoveringRadius() + precisionError);
-    //clean home
-    for (i = 0; i < total - 2; i++) {
-        delete vectKey[i];
-    }//endfor
-    delete [] vectKey;
-    delete [] vectSub;
-    delete [] vectCoverage;
-    delete newIndex;
     return objPromote;
 }//splitIndex
 
