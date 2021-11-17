@@ -76,6 +76,14 @@ public:
 
 	void pushKey(Byte array[], Int position);
 
+	Double getPreservedDistance() {
+			return preservedDistance;
+		}
+
+	void setPreservedDistance(Double preservedDistance) {
+		this->preservedDistance = preservedDistance;
+	}
+
 	Int sizeOfKey();
 };
 } /* namespace tree */

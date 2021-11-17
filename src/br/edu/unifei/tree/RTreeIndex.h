@@ -27,8 +27,7 @@ using namespace std;
 template <typename K>
 class RTreeIndex : public RTreeNode<K>{
 private:
-    static const Int nodeType = 7;
-    static const Int numMbrs = 0;
+    static const Int nodeType = 9;
 
 protected:
 
@@ -66,16 +65,6 @@ public:
 
     Long readSubPageId(Int idx);
 
-    void remove(Int idx);
-
-    static long getNumMbrs(){
-    	return this->numMbrs;
-    }
-
-    static void resetNumMbrs(){
-    	this->numMbrs = 0;
-    }
-
     void replace(int idx, K * key);
 
 };
@@ -85,52 +74,41 @@ public:
 
 template <typename K>
 Bool RTreeIndex<K>::addKey(K * key, Long subPageId) {
-    Int total = this->readNumberOfKeys();
+	Int total = this->readNumberOfKeys();
+	Int size = key->sizeOfKey();
 
-    Int size = key->sizeOfKey();
+	if (size + this->sizeOfEntry() > this->freeSpace(size)) // It there is not space.
+	{
+		return false;
+	}
+	else
+	{
+		int off = this->getOffset(total, size);
+		key->pushKey(this->getArray(), off); // Adding
+		this->writeSubPageId(total, subPageId);
+		this->incrementNumberOfKeys();
 
-    if (size + this->sizeOfEntry() > this->freeSpace()) // It there is not space.
-    {
-        return false;
-    } else {
-        Int off = total == 0 ? this->sizeOfArray() - size : this->readOffset(total - 1) - size;
-        key->pushKey(this->getArray(), off); // Adding
-        this->writeOffset(total, off);
-        this->writeDistanceToParent(total, dist);
-        this->writeSubPageId(total, subPageId);
-        this->writeCoveringRadius(total, covRad);
-        this->incrementNumberOfKeys();
-
-        return true;
-    }
+		return true;
+	}
 }//addKey
 
 //----------------------------------------------------------------------
 
 template <typename K>
 Bool RTreeIndex<K>::addKey(K * key1, Long subPageId1, K * key2, Long subPageId2) {
-    Int sizeKey1 = key1->sizeOfKey();
-    Int sizeKey2 = key2->sizeOfKey();
+	Int size = key1->sizeOfKey();
 
-    if (sizeKey1 + sizeKey2 + 2 * this->sizeOfEntry() > this->freeSpace()) {
-        return false;
-    } else {
-        addKey(key1, dist1, subPageId1, covRad1);
-        addKey(key2, dist2, subPageId2, covRad2);
-        return true;
-    }
+	if (size + size + 2 * this->sizeOfEntry() > this->freeSpace(size))
+	{
+		return false;
+	}
+	else
+	{
+		addKey(key1, subPageId1);
+		addKey(key2, subPageId2);
+		return true;
+	}
 }//addKey
-
-//----------------------------------------------------------------------
-
-template <typename K>
-Double RTreeIndex<K>::distanceToQualify(Int idx, K * insertKey) {
-    K * key = this->buildKey(idx);
-    this->calculatedDistance++;
-    double dist = insertKey->distanceTo(key);
-    delete key;
-    return dist;
-}//distanceToQualify
 
 //----------------------------------------------------------------------
 
@@ -208,54 +186,6 @@ Int RTreeIndex<K>::indexOfSubPageId(Long pageId) {
 
     return -1;
 }//indexOfSubPageId
-
-//----------------------------------------------------------------------
-
-template <typename K>
-void RTreeIndex<K>::remove(Int idx) {
-    Int sizeKey = idx == 0
-            ? this->sizeOfArray() - this->readOffset(0)
-            : this->readOffset(idx - 1) - this->readOffset(idx);
-    Int total = this->readNumberOfKeys();
-    Int length = this->readOffset(idx) - this->readOffset(total - 1);
-    Int source = this->readOffset(total - 1);
-    Int dest = source + sizeKey;
-
-    this->move(dest, source, length);
-
-    for (Int k = idx; k < total - 1; k++) {
-        this->writeOffset(k, this->readOffset(k + 1) + sizeKey);
-        this->writeDistanceToParent(k, this->readDistanceToParent(k + 1));
-        this->writeSubPageId(k, this->readSubPageId(k + 1));
-
-        this->writeCoveringRadius(k, this->readCoveringRadius(k + 1));
-    }
-    this->decrementNumberOfKeys();
-}//remove
-
-//----------------------------------------------------------------------
-
-template <typename K>
-Double RTreeIndex<K>::readCoveringRadius(Int idx) {
-    Int pos = Node::sizeOfHeader()
-            + this->sizeOfFeatures()
-            + (idx * this->sizeOfEntry())
-            + Node::sizeOfLong; // sub
-
-    return this->readDouble(pos);
-}//readCoveringRadius
-
-//----------------------------------------------------------------------
-
-template <typename K>
-void RTreeIndex<K>::writeCoveringRadius(Int idx, Double rad) {
-    Int pos = Node::sizeOfHeader()
-            + this->sizeOfFeatures()
-            + (idx * this->sizeOfEntry())
-            + Node::sizeOfLong; // sub
-
-    this->writeDouble(pos, rad);
-}//writeCoveringRadius
 
 //----------------------------------------------------------------------
 

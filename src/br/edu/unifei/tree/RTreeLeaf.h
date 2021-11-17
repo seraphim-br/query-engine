@@ -58,7 +58,7 @@ protected:
 
     void writeEntityUuid(Int idx, Uuid * uuid);
 public:
-    static const Int nodeType = 6;
+    static const Int nodeType = 8;
 
     RTreeLeaf(Node * node) : RTreeNode<K>(node) {
         static_assert(is_base_of<Metric<K>, K>::value, "Generic type is not derived of the Order class");
@@ -68,7 +68,7 @@ public:
     virtual ~RTreeLeaf() {
     }
 
-    Bool addKey(K * key, Double dist, Uuid * uuid);
+    Bool addKey(K * key, Uuid * uuid);
 
     static Bool matchNodeType(Node * node) {
         return node->readNodeType() == RTreeLeaf<K>::nodeType;
@@ -76,26 +76,23 @@ public:
 
     Uuid * readEntityUuid(Int idx);
 
-    void remove(Int idx);
-
 };
 
 //----------------------------------------------------------------------
 
 template <typename K>
-Bool RTreeLeaf<K>::addKey(K * key, Double dist, Uuid * uuid) {
+Bool RTreeLeaf<K>::addKey(K * key, Uuid * uuid) {
     Int total = this->readNumberOfKeys();
 
     Int size = key->sizeOfKey();
 
-    if (size + this->sizeOfEntry() > this->freeSpace()) // It there is not space.
+    if (size + this->sizeOfEntry() > this->freeSpace(size)) // It there is not space.
     {
         return false;
     } else {
-        Int off = total == 0 ? this->sizeOfArray() - size : this->readOffset(total - 1) - size;
+        Int off = this->getOffset(total, size);
         key->pushKey(this->getArray(), off); // Adding
         this->writeOffset(total, off);
-        this->writeDistanceToParent(total, dist);
         this->writeEntityUuid(total, uuid);
         this->incrementNumberOfKeys();
 
@@ -110,28 +107,6 @@ Uuid * RTreeLeaf<K>::readEntityUuid(Int idx) {
     Int pos = Node::sizeOfHeader() + this->sizeOfFeatures() + (idx * this->sizeOfEntry());
     return this->readUuid(pos);
 }//readEntityUuid
-
-//----------------------------------------------------------------------
-
-template <typename K>
-void RTreeLeaf<K>::remove(Int idx) {
-    Int sizeKey = idx == 0
-            ? this->sizeOfArray() - this->readOffset(0)
-            : this->readOffset(idx - 1) - this->readOffset(idx);
-    Int total = this->readNumberOfKeys();
-    Int length = this->readOffset(idx) - this->readOffset(total - 1);
-    Int source = this->readOffset(total - 1);
-    Int dest = source + sizeKey;
-
-    this->move(dest, source, length);
-
-    for (Int k = idx; k < total - 1; k++) {
-        this->writeOffset(k, this->readOffset(k + 1) + sizeKey);
-        this->writeDistanceToParent(k, this->readDistanceToParent(k + 1));
-        this->writeEntityUuid(k, this->readEntityUuid(k + 1));
-    }
-    this->decrementNumberOfKeys();
-}
 
 //----------------------------------------------------------------------
 

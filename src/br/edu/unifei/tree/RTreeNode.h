@@ -50,21 +50,17 @@ using namespace std;
 template <typename K>
 class RTreeNode: public AbstractNode {
 protected:
-    Long calculatedDistance;
-
     void decrementNumberOfKeys();
 
-    Int freeSpace();
+    Int freeSpace(Int sizeOfKey);
 
     void incrementNumberOfKeys();
 
-    Int readOffset(Int idx);
+    Int getOffset(Int idx, Int sizeOfKey);
 
     Int sizeOfFeatures() {
         return Node::sizeOfInt;
     }
-
-    void writeOffset(Int idx, Int off);
 
     virtual Int sizeOfEntry() = 0;
 
@@ -73,15 +69,10 @@ public:
 
     RTreeNode(Node * node) : AbstractNode(node) {
         static_assert(is_base_of<Rectangle<K>, K>::value, "Generic type is not derived of the Rectangle class");
-        calculatedDistance = 0;
     }
 
     virtual ~RTreeNode(){
 
-    }
-
-    Long getCalculatedDistance() {
-        return calculatedDistance;
     }
 
     K * buildKey(Int idx);
@@ -91,15 +82,6 @@ public:
     Int indexOfKey(K * key);
 
     Int readNumberOfKeys();
-
-    Double readDistanceToParent(Int idx);
-
-    Bool replace(Int idx, K * replaceKey);
-
-    void writeDistanceToParent(Int idx, Double dist);
-
-    virtual void remove(Int idx) = 0;
-
 };
 
 
@@ -109,7 +91,7 @@ K * RTreeNode<K>::buildKey(Int idx) {
     if ((idx >= 0) && (idx < this->readNumberOfKeys())) {
         key = new K();
         //pull the key of the page
-        key->pullKey(this->getArray(), this->readOffset(idx));
+        key->pullKey(this->getArray(), this->getOffset(idx, key->sizeOfKey()));
         return key;
     }//endif
     return NULL;
@@ -136,7 +118,7 @@ void RTreeNode<K>::decrementNumberOfKeys() {
 //----------------------------------------------------------------------
 
 template <typename K>
-Int RTreeNode<K>::freeSpace() {
+Int RTreeNode<K>::freeSpace(Int sizeOfKey) {
     Int num = this->readNumberOfKeys();
     Int free = 0;
     if (num == 0) {
@@ -144,7 +126,7 @@ Int RTreeNode<K>::freeSpace() {
     } else {
         free = this->sizeOfArray() - Node::sizeOfHeader()
                 - this->sizeOfFeatures() - (num * this->sizeOfEntry())
-                - (this->sizeOfArray() - this->readOffset(num - 1));
+                - (this->sizeOfArray() - this->getOffset((num - 1), sizeOfKey));
     }//endif
     return free;
 }//freeSpace
@@ -181,19 +163,6 @@ void RTreeNode<K>::incrementNumberOfKeys() {
 //----------------------------------------------------------------------
 
 template <typename K>
-Double RTreeNode<K>::readDistanceToParent(Int idx) {
-    Int pos = Node::sizeOfHeader()
-            + this->sizeOfFeatures()
-            + ((idx + 1) * this->sizeOfEntry())
-            - Node::sizeOfInt // off
-            - Node::sizeOfDouble; // parent distance
-
-    return this->readDouble(pos);
-}//readDistanceToParent
-
-//----------------------------------------------------------------------
-
-template <typename K>
 Int RTreeNode<K>::readNumberOfKeys() {
     Int pos = Node::sizeOfHeader();
     return this->readInt(pos);
@@ -202,51 +171,11 @@ Int RTreeNode<K>::readNumberOfKeys() {
 //----------------------------------------------------------------------
 
 template <typename K>
-Int RTreeNode<K>::readOffset(Int idx) {
-    Int pos = Node::sizeOfHeader() + this->sizeOfFeatures() + ((idx + 1) * this->sizeOfEntry()) - Node::sizeOfInt;
-    return this->readInt(pos);
+Int RTreeNode<K>::getOffset(Int idx, Int sizeOfKey) {
+    return this->sizeOfArray() - ((idx + 1) * sizeOfKey);
 }//readOffset
 
 //----------------------------------------------------------------------
-
-template <typename K>
-Bool RTreeNode<K>::replace(Int idx, K * replaceKey) {
-    Int total = this->readNumberOfKeys();
-    Int offLastKey = this->readOffset(total - 1);
-    Int length = this->readOffset(idx) - offLastKey;
-    Int sizeOldKey = idx == 0 ? this->sizeOfArray() - this->readOffset(0) : this->readOffset(idx - 1) - this->readOffset(idx);
-    Int offSize = sizeOldKey - replaceKey->sizeOfKey();
-    if (replaceKey->sizeOfKey() <= this->freeSpace() + sizeOldKey) {
-        this->move(offLastKey + offSize, offLastKey, length);
-        for (Int i = idx; i <= total - 1; i++) {
-            this->writeOffset(i, this->readOffset(i) + offSize);
-        }
-        replaceKey->pushKey(this->getArray(), this->readOffset(idx));
-        return true;
-    } else {
-        return false;
-    }
-}//replace
-
-//----------------------------------------------------------------------
-
-template <typename K>
-void RTreeNode<K>::writeDistanceToParent(Int idx, Double dist) {
-    Int pos = Node::sizeOfHeader()
-            + this->sizeOfFeatures()
-            + ((idx + 1) * this->sizeOfEntry())
-            - Node::sizeOfInt
-            - Node::sizeOfDouble;
-    this->writeDouble(pos, dist);
-}//writeDistanceToParent
-
-//----------------------------------------------------------------------
-
-template <typename K>
-void RTreeNode<K>::writeOffset(Int idx, Int off) {
-    Int pos = Node::sizeOfHeader() + this->sizeOfFeatures() + ((idx + 1) * this->sizeOfEntry()) - Node::sizeOfInt;
-    this->writeInt(pos, off);
-}//writeOffset
 
 } /* namespace tree */
 } /* namespace unifei */

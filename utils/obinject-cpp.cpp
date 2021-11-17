@@ -1,5 +1,6 @@
 #include <br/edu/unifei/tree/File.h>
 #include <br/edu/unifei/tree/Point.h>
+#include <br/edu/unifei/tree/PointRTree.h>
 #include <iostream>
 #include <fstream>
 #include <cstdlib>
@@ -7,6 +8,7 @@
 #include <queue>
 
 #include "br/edu/unifei/tree/MTree.h"
+#include "br/edu/unifei/tree/RTree.h"
 #include "br/edu/unifei/tree/Punctual.h"
 #include "br/edu/unifei/tree/KFarthest.h"
 #include "br/edu/unifei/tree/KFarthestNearest.h"
@@ -28,8 +30,11 @@ Int main(Int argc, char **argv) {
 	// if exists mtree
 	if (!fileStream.fail()) {
 		//creating mtree
-		File *file = new File("../data/geonet.mtree");
-		MTree<Point> *mtree = new MTree<Point>(file);
+		File *fileMtree = new File("../data/geonet.mtree");
+		MTree<Point> *mtree = new MTree<Point>(fileMtree);
+
+		File *fileRtree = new File("../data/geonet.rtree");
+		RTree<PointRTree> *rtree = new MTree<Point>(fileRtree);
 
 		KFarthest<Point> *kfar = new KFarthest<Point>(mtree);
 		KFarthestNearest<Point> *kfarNear = new KFarthestNearest<Point>(mtree);
@@ -92,7 +97,7 @@ Int main(Int argc, char **argv) {
 		cout << "[kfar near] time:" << kfarNear->getPerformance()->measuredTime() << endl;
 		//clean home
 		delete kfar;
-		delete file;
+		delete fileMtree;
 		delete mtree;
 	} else {
 		//clean home

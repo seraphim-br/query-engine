@@ -57,8 +57,8 @@ public:
 template <typename K>
 K * EuclideanGeometry<K>::unionRectangles(K * rect1, K * rect2) {
     Int dims = rect1->numberOfDimensions();
-    Double minPoint[] = new Double[dims];
-    Double maxPoint[] = new Double[dims];
+    Double * minPoint = new Double[dims];
+    Double * maxPoint = new Double[dims];
     Double coord1;
     Double coord2;
     K mbrUnion = new K();
@@ -72,6 +72,8 @@ K * EuclideanGeometry<K>::unionRectangles(K * rect1, K * rect2) {
         mbrUnion.setOrigin(i, minPoint[i]);
         mbrUnion.setExtension(i, maxPoint[i] - minPoint[i] + this->precisionError);
     }
+    delete [] minPoint;
+    delete [] maxPoint;
     return mbrUnion;
 }
 

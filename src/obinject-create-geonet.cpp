@@ -4,8 +4,10 @@
 #include <cstring>
 #include <queue>
 
+#include <br/edu/unifei/tree/PointRTree.h>
 #include "br/edu/unifei/tree/File.h"
 #include "br/edu/unifei/tree/MTree.h"
+#include "br/edu/unifei/tree/RTree.h"
 #include "br/edu/unifei/tree/Punctual.h"
 #include "br/edu/unifei/tree/KFarthest.h"
 #include "br/edu/unifei/tree/Point.h"
@@ -27,9 +29,12 @@ Int main(Int argc, char **argv) {
 	// if exists mtree
 	if (fileStream.fail()) {
 		//creating mtree
-		File *fileNew = new File("../data/geonet.mtree", 8192);
-		MTree<Point> *mtreeNew = new MTree<Point>(fileNew);
+		File *fileMTreeNew = new File("../data/geonet.mtree", 8192);
+		MTree<Point> *mtreeNew = new MTree<Point>(fileMTreeNew);
 		Punctual<Point> *punct = new Punctual<Point>(mtreeNew);
+
+		File *fileRTreeNew = new File("../data/geonet.rtree", 8192);
+		RTree<PointRTree> *rtreeNew = new RTree<PointRTree>(fileRTreeNew);
 
 		while (ifs.getline(buf, 1023)) {
 			if (strlen(buf) > 0) {
@@ -51,18 +56,26 @@ Int main(Int argc, char **argv) {
 				pIns->setLatitude(lat);
 				pIns->setLongitude(lon);
 				mtreeNew->add(pIns);
-				Uuid *uuidFind = punct->execute(pIns);
-				if (uuidFind == NULL) {
-					cout << "FAIL IN INSERTION: lat=" << pIns->getLatitude()
-							<< " Long=" << pIns->getLongitude() << endl;
-				}
+//				Uuid *uuidFind = punct->execute(pIns);
+//				if (uuidFind == NULL) {
+//					cout << "FAIL IN INSERTION: lat=" << pIns->getLatitude()
+//							<< " Long=" << pIns->getLongitude() << endl;
+//				}
+
+				//point
+				PointRTree *pRtree = new PointRTree();
+				pRtree->setOrigin(0, lat);
+				pRtree->setOrigin(1, lat);
+				rtreeNew->add(pRtree);
+
 				//clean home
-				delete uuidFind;
+				delete pRtree;
+//				delete uuidFind;
 				delete pIns;
 			}
 		}
 		//clean home
-		delete fileNew;
+		delete fileMTreeNew;
 		delete mtreeNew;
 	} else {
 		//clean home

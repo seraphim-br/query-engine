@@ -139,13 +139,12 @@ Bool RTree<K>::add(K * key) {
     if (rootPageId == 0) // tree is empty
     {
         RTreeLeaf<K> * leaf = new RTreeLeaf<K>(se->create());
-        leaf->addKey(key, DBL_MAX, key->getUuid());
+        leaf->addKey(key, key->getUuid());
         // Circularly link
         leaf->writePreviousPageId(leaf->getPageId());
         leaf->writeNextPageId(leaf->getPageId());
         descriptor->writeRootPageId(leaf->getPageId());
         descriptor->incTreeHeight();
-        averageForAdd->incrementVerification(leaf->getCalculatedDistance());
         //clean home
         delete leaf;
     } else {
@@ -301,12 +300,6 @@ Bool RTree<K>::add(K * key) {
     averageForAdd->incrementMeasurement();
     return true;
 }//add
-//----------------------------------------------------------------------
-
-template <typename K>
-Workspace * RTree<K>::getWorkspace(){
-	return workspace;
-}
 
 //----------------------------------------------------------------------
 
@@ -337,9 +330,6 @@ RTreePromotion<K> * RTree<K>::splitIndex(Session * se,
         RTreeIndex<K> * fullIndex, RTreeIndex<K> * newIndex,
         K * key, Long subId) {
     Int i, j;
-//    Long nextPageId;
-//    double dist1, dist2;
-//    bool failAddKey;
     Int total = fullIndex->readNumberOfKeys() + 1;
 
     K ** vecKey = new K*[total];
@@ -379,7 +369,6 @@ RTreePromotion<K> * RTree<K>::splitIndex(Session * se,
 	fullIndex->addKey(vecKey[idx1], vecSub[idx1]);
 
 	//cleanning newIndex and inserting vecKey[idx2]
-//	RTreeIndex<K> * newIndex = new RTreeIndex<K>(se->create());
 	newIndex->clear();
 	newIndex->addKey(vecKey[idx2], vecSub[idx2]);
 
@@ -394,12 +383,12 @@ RTreePromotion<K> * RTree<K>::splitIndex(Session * se,
 
 			if (ocup1 < ocup2) {
 				if (!fullIndex->addKey(vecKey[i], vecSub[i])) {
-					throw new runtime_error("add fail");
+					throw runtime_error("add fail");
 				}
 				objPromote->setFirstKey(union1);
 			} else if (ocup1 > ocup2) {
 				if (!newIndex->addKey(vecKey[i], vecSub[i])) {
-					throw new runtime_error("add fail");
+					throw runtime_error("add fail");
 				}
 				objPromote->setSecondKey(union2);
 			} else {
@@ -407,31 +396,32 @@ RTreePromotion<K> * RTree<K>::splitIndex(Session * se,
 				double ocupProm2 = geometry->occupancy(objPromote->getSecondKey());
 				if (ocupProm1 < ocupProm2) {
 					if (!fullIndex->addKey(vecKey[i], vecSub[i])) {
-						throw new runtime_error("add fail");
+						throw runtime_error("add fail");
 					}
 					objPromote->setFirstKey(union1);
 				} else if (ocupProm1 > ocupProm2) {
 					if (!newIndex->addKey(vecKey[i], vecSub[i])) {
-						throw new runtime_error("add fail");
+						throw runtime_error("add fail");
 					}
 					objPromote->setSecondKey(union2);
 				} else {
 					double dist1 = objPromote->getFirstKey().distanceTo(vecKey[i]);
 					double dist2 = objPromote->getSecondKey().distanceTo(vecKey[i]);
+			        averageForAdd->incrementVerification(2);
 
 					if (dist1 < dist2) {
 						if (!fullIndex->addKey(vecKey[i], vecSub[i])) {
-							throw new runtime_error("add fail");
+							throw runtime_error("add fail");
 						}
 						objPromote->setFirstKey(union1);
 					} else if (dist1 > dist2) {
 						if (!newIndex->addKey(vecKey[i], vecSub[i])) {
-							throw new runtime_error("add fail");
+							throw runtime_error("add fail");
 						}
 						objPromote->setSecondKey(union2);
 					} else if (fullIndex->readNumberOfKeys() <= newIndex->readNumberOfKeys()) {
 						if (!fullIndex->addKey(vecKey[i], vecSub[i])) {
-							throw new runtime_error("add fail");
+							throw runtime_error("add fail");
 						}
 						objPromote->setFirstKey(union1);
 					} else {
@@ -454,11 +444,16 @@ RTreePromotion<K> * RTree<K>::splitIndex(Session * se,
     if (nextPageId != fullIndex->getPageId()) {
     	RTreeIndex<K> nextIndex = new RTreeIndex<K>(se->load(nextPageId));
         nextIndex->writePreviousPageId(newIndex->getPageId());
-//        averageForAdd->incrementVerification(nextIndex->getCalculatedDistance());
-//        delete nextIndex;
+        delete nextIndex;
     } else {
         fullIndex->writePreviousPageId(newIndex->getPageId());
     }
+    // clear home
+	for (i = 0; i < total; i++) {
+		delete vecKey[i];
+	}//endfor
+	delete [] vecSub;
+	delete [] vecKey;
     return objPromote;
 }//splitIndex
 
@@ -467,12 +462,12 @@ RTreePromotion<K> * RTree<K>::splitIndex(Session * se,
 template <typename K>
 RTreePromotion<K> * RTree<K>::splitLeaf(Session * se, RTreeLeaf<K> * fullLeaf, RTreeLeaf<K> newLeaf, K * key, Uuid * uuid) {
 
-    Int i, j;;
+    Int i, j;
     Int total = fullLeaf->readNumberOfKeys() + 1;
 
     //copy all keys and subPageId
-	Uuid ** vecUuid = new Uuid*[total]; // essa declaração está correta??
-	K ** vecKey = new K*[total]; // essa declaração está correta??
+	Uuid ** vecUuid = new Uuid*[total];
+	K ** vecKey = new K*[total];
 	//coping key and subPageId
 	for (i = 0; i < total - 1; i++) {
 		vecKey[i] = fullLeaf->buildKey(i);
@@ -484,9 +479,9 @@ RTreePromotion<K> * RTree<K>::splitLeaf(Session * se, RTreeLeaf<K> * fullLeaf, R
 	vecUuid[i] = uuid;
 
 	// Choose promote
-	Double ocup = -1.0; //d
+	Double ocup = -1.0;
 
-	RTreePromotion<K> objPromote;
+	RTreePromotion<K> * objPromote;
 
     Double d;
     Int idx1 = 0, idx2 = 1;
@@ -505,6 +500,7 @@ RTreePromotion<K> * RTree<K>::splitLeaf(Session * se, RTreeLeaf<K> * fullLeaf, R
 				idx1 = i;
 				idx2 = j;
 			}
+			delete mbrUnion;
 		}
 	}
 
@@ -527,12 +523,12 @@ RTreePromotion<K> * RTree<K>::splitLeaf(Session * se, RTreeLeaf<K> * fullLeaf, R
 
 			if (ocup1 < ocup2) {
 				if (!fullLeaf->addKey(vecKey[i], vecUuid[i])) {
-					throw new runtime_error("add fail");
+					throw runtime_error("add fail");
 				}
 				objPromote->setFirstKey(union1);
 			} else if (ocup1 > ocup2) {
 				if (!newLeaf->addKey(vecKey[i], vecUuid[i])) {
-					throw new runtime_error("add fail");
+					throw runtime_error("add fail");
 				}
 				objPromote->setSecondKey(union2);
 			} else {
@@ -540,41 +536,45 @@ RTreePromotion<K> * RTree<K>::splitLeaf(Session * se, RTreeLeaf<K> * fullLeaf, R
 				double ocupProm2 = geometry->occupancy(objPromote->getSecondKey());
 				if (ocupProm1 < ocupProm2) {
 					if (!fullLeaf->addKey(vecKey[i], vecUuid[i])) {
-						throw new runtime_error("add fail");
+						throw runtime_error("add fail");
 					}
 					objPromote->setFirstKey(union1);
 				} else if (ocupProm1 > ocupProm2) {
 					if (!newLeaf->addKey(vecKey[i], vecUuid[i])) {
-						throw new runtime_error("add fail");
+						throw runtime_error("add fail");
 					}
 					objPromote->setSecondKey(union2);
 				} else {
 					double dist1 = objPromote->getFirstKey()->distanceTo(vecKey[i]);
 					double dist2 = objPromote->getSecondKey()->distanceTo(vecKey[i]);
+			        averageForAdd->incrementVerification(2);
 
 					if (dist1 < dist2) {
 						if (!fullLeaf->addKey(vecKey[i], vecUuid[i])) {
-							throw new runtime_error("add fail");
+							throw runtime_error("add fail");
 						}
 						objPromote->setFirstKey(union1);
 					} else if (dist1 > dist2) {
 						if (!newLeaf->addKey(vecKey[i], vecUuid[i])) {
-							throw new runtime_error("add fail");
+							throw runtime_error("add fail");
 						}
 						objPromote->setSecondKey(union2);
 					} else if (fullLeaf->readNumberOfKeys() <= newLeaf->readNumberOfKeys()) {
 						if (!fullLeaf->addKey(vecKey[i], vecUuid[i])) {
-							throw new runtime_error("add fail");
+							throw runtime_error("add fail");
 						}
 						objPromote->setFirstKey(union1);
 					} else {
 						if (!newLeaf->addKey(vecKey[i], vecUuid[i])) {
-							throw new runtime_error("add fail");
+							throw runtime_error("add fail");
 						}
 						objPromote->setSecondKey(union2);
 					}
 				}
 			}
+			// clear home
+			delete union1;
+			delete union2;
 		}
 	}
 
@@ -586,9 +586,17 @@ RTreePromotion<K> * RTree<K>::splitLeaf(Session * se, RTreeLeaf<K> * fullLeaf, R
 	if (nextPageId != fullLeaf->getPageId()) {
 		RTreeLeaf<K> nextLeaf = new RTreeLeaf<K>(se->load(nextPageId)); //, this->getObjectClass()
 		nextLeaf->writePreviousPageId(newLeaf->getPageId());
+		delete nextLeaf;
 	} else {
 		fullLeaf->writePreviousPageId(newLeaf->getPageId());
 	}
+	// clear home
+	for (i = 0; i < total; i++) {
+		delete vecKey[i];
+		delete vecUuid[i];
+	}//endfor
+	delete [] vecUuid;
+	delete [] vecKey;
 	return objPromote;
 
 
