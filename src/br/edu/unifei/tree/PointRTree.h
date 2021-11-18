@@ -77,11 +77,19 @@ public:
 	void pushKey(Byte array[], Int position);
 
 	Double getPreservedDistance() {
-			return preservedDistance;
-		}
+		return preservedDistance;
+	}
 
 	void setPreservedDistance(Double preservedDistance) {
 		this->preservedDistance = preservedDistance;
+	}
+
+	Uuid* getUuid() {
+		return uuid;
+	}
+
+	void setUuid(Uuid *uuid) {
+		this->uuid = uuid;
 	}
 
 	Int sizeOfKey();

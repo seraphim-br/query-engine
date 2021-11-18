@@ -61,7 +61,7 @@ K * EuclideanGeometry<K>::unionRectangles(K * rect1, K * rect2) {
     Double * maxPoint = new Double[dims];
     Double coord1;
     Double coord2;
-    K mbrUnion = new K();
+    K * mbrUnion = new K();
     calculatedOverlap++;
 
     for (int i = 0; i < dims; i++) {
@@ -69,8 +69,8 @@ K * EuclideanGeometry<K>::unionRectangles(K * rect1, K * rect2) {
         coord2 = rect2->getOrigin(i);
         minPoint[i] = std::min(coord1, coord2);
         maxPoint[i] = std::max(coord1 + rect1->getExtension(i), coord2 + rect2->getExtension(i));
-        mbrUnion.setOrigin(i, minPoint[i]);
-        mbrUnion.setExtension(i, maxPoint[i] - minPoint[i] + this->precisionError);
+        mbrUnion->setOrigin(i, minPoint[i]);
+        mbrUnion->setExtension(i, maxPoint[i] - minPoint[i] + this->precisionError);
     }
     delete [] minPoint;
     delete [] maxPoint;

@@ -30,8 +30,8 @@ private:
 
     public:
 
-        RTreePromotion(K * firstKey, double firstCoveringRadius, Long fistSubPageId,
-                K * secondKey, double secondCoveringRadius, Long secondSubPageId) :
+        RTreePromotion(K * firstKey, Long fistSubPageId,
+                K * secondKey, Long secondSubPageId) :
             firstKey(firstKey), fistSubPageId(fistSubPageId),
 			secondKey(secondKey), secondSubPageId(secondSubPageId){
             static_assert(is_base_of<Rectangle<K>, K>::value, "Generic type is not derived of the Rectangle class");
@@ -57,6 +57,15 @@ private:
         Long getSecondSubPageId() {
             return this->secondSubPageId;
         }
+
+        void setSecondKey(K *secondKey) {
+			this->secondKey = secondKey;
+		}
+
+
+        void setFirstKey(K *firstKey) {
+			this->firstKey = firstKey;
+		}
 };
 
 } /* namespace tree */

@@ -60,7 +60,7 @@ private:
             RTreeIndex<K> * fullIndex, RTreeIndex<K> * newIndex,
             K * Key, Long subId);
 
-    RTreePromotion<K> * splitLeaf(Session * se, RTreeLeaf<K> * fullLeaf, RTreeLeaf<K> newLeaf, K * key, Uuid * uuid);
+    RTreePromotion<K> * splitLeaf(Session * se, RTreeLeaf<K> * fullLeaf, RTreeLeaf<K> * newLeaf, K * key, Uuid * uuid);
 
 
 public:
@@ -132,13 +132,14 @@ Bool RTree<K>::add(K * key) {
     steady_clock::time_point t1 = steady_clock::now();
     Session * se = this->workspace->openSession();
     Long diskAccess = se->getBlockAccess();
+    long verifications = this->geometry->getCalculatedOverlap();
     Long pageIdDescriptor = se->findPageIdDescriptor(RTreeDescriptor::nodeType);
     RTreeDescriptor * descriptor = new RTreeDescriptor(se->load(pageIdDescriptor));
     Long rootPageId = descriptor->readRootPageId();
 
     if (rootPageId == 0) // tree is empty
     {
-        RTreeLeaf<K> * leaf = new RTreeLeaf<K>(se->create());
+        RTreeLeaf<K> * leaf = new RTreeLeaf<K>(se->create()); // em java passa dois argumentos
         leaf->addKey(key, key->getUuid());
         // Circularly link
         leaf->writePreviousPageId(leaf->getPageId());
@@ -151,7 +152,6 @@ Bool RTree<K>::add(K * key) {
         Int pathLength = descriptor->readTreeHeight();
         Long * path = new Long[pathLength];
         Node * node = se->load(rootPageId);
-        double dist = DBL_MAX; // Distance to parent
 
         Int level = 1;
         Int qualify;
@@ -162,126 +162,69 @@ Bool RTree<K>::add(K * key) {
             RTreeIndex<K> * index = new RTreeIndex<K>(node);
             path[level] = index->getPageId();
             level++;
-            qualify = index->indexOfInsertion(key);
+            qualify = index->indexOfInsertion(key, this->geometry);
             subPageId = index->readSubPageId(qualify);
-            dist = index->distanceToQualify(qualify, key);
             node = se->load(subPageId);
-            averageForAdd->incrementVerification(index->getCalculatedDistance());
             //clean home
             delete index;
         }
 
         RTreeLeaf<K> * leaf = new RTreeLeaf<K>(node);
 
-        if (leaf->addKey(key, dist, key->getUuid()) == false) {
-            Int idxSub, idxParent;
-            Long pageIdSub;
-            Long pageIdActual;
-            double distPromoParent1, distPromoParent2;
-            double coveringSub = 0;
-            double cov1, cov2;
-            bool promote = true;
-            RTreeIndex<K> * actualIndex, * parentIndex;
-            K * parentKey;
+        if (leaf->addKey(key, key->getUuid()) == false) {
+            Bool promote = true;
+            RTreeLeaf<K> * newLeaf = new RTreeLeaf<K>(se->create());
+            RTreeIndex<K> * index;
+            RTreeIndex<K> * newIndex;
+            Long pageIdRem = leaf->getPageId();
             //split leaf
-            RTreePromotion<K> * objPromote = splitLeaf(se, leaf, key, key->getUuid());
-            RTreePromotion<K> * objIndexPromote;
 
-            level = pathLength - 1;
-            Long parent = path[level];
+			RTreePromotion<K> *objPromote = this->splitLeaf(se, leaf, newLeaf, key, key->getUuid());
 
-            if (parent != 0) {
-                //pageId of the sub node
-                pageIdSub = leaf->getPageId();
-                actualIndex = new RTreeIndex<K>(se->load(parent));
+			level = pathLength - 1;
 
-                while (level > 0) {
-                    if (path[level - 1] != 0) {
-                        //pageId of actual node
-                        pageIdActual = actualIndex->getPageId();
-                        parentIndex = new RTreeIndex<K>(se->load(path[level - 1]));
+            while (level > 0) {
+				node = se->load(path[level]);
 
-                        //calc dist
-                        idxParent = parentIndex->indexOfSubPageId(pageIdActual);
-                        parentKey = parentIndex->buildKey(idxParent);
-                        distPromoParent1 = objPromote->getFirstKey()->distanceTo(parentKey);
-                        distPromoParent2 = objPromote->getSecondKey()->distanceTo(parentKey);
+				if (promote == true) {
+					index = new RTreeIndex<K>(node);
+					Int idxReplc = index->indexOfSubPageId(pageIdRem);
+					index->replace(idxReplc, objPromote->getFirstKey());
 
-                        averageForAdd->incrementVerification(parentIndex->getCalculatedDistance()+2);
-                        //clean home
-                        delete parentKey;
-                    } else {
-                        parentIndex = NULL;
-                        distPromoParent1 = DBL_MAX;
-                        distPromoParent2 = DBL_MAX;
-                    }
+					if (index->addKey(objPromote->getSecondKey(), objPromote->getSecondSubPageId())) {
+						promote = false;
+					} else {
+						newIndex = new RTreeIndex<K>(se->create());
+						objPromote = this->splitIndex(se, index, newIndex, objPromote->getSecondKey(), objPromote->getSecondSubPageId());
+//						nodeLeft = index;
+//						nodeRight = newIndex;
+						pageIdRem = node->getPageId();
+						promote = true;
 
-                    //search the index
-                    idxSub = actualIndex->indexOfSubPageId(pageIdSub);
-                    if (promote == true) {
-                        //remove old promoted key
-                        actualIndex->remove(idxSub);
+						//clean home
+			            delete newIndex; //nao sei
 
-                        if (actualIndex->addKey(objPromote->getFirstKey(), distPromoParent1, objPromote->getFistSubPageId(), objPromote->getFirstCoveringRadius(),
-                                objPromote->getSecondKey(), distPromoParent2, objPromote->getSecondSubPageId(), objPromote->getSecondCoveringRadius())) {
-                            promote = false;
-                        } else {
-                            //split index
-                            objIndexPromote = splitIndex(se, actualIndex,
-                                    objPromote->getFirstKey(), objPromote->getFistSubPageId(), objPromote->getFirstCoveringRadius(),
-                                    objPromote->getSecondKey(), objPromote->getSecondSubPageId(), objPromote->getSecondCoveringRadius());
-                            promote = true;
-                            //clean home
-                            delete objPromote;
-                            //update objPromote
-                            objPromote = objIndexPromote;
-                        }//endif
+					}
+				}
 
-                        cov1 = distPromoParent1 + objPromote->getFirstCoveringRadius();
-                        cov2 = distPromoParent2 + objPromote->getSecondCoveringRadius();
-                        if (cov1 > cov2) {
-                            coveringSub = cov1;
-                        } else {
-                            coveringSub = cov2;
-                        }
-                    } else {
-                        if (actualIndex->readCoveringRadius(idxSub) < coveringSub) {
-                            actualIndex->writeCoveringRadius(idxSub, coveringSub);
-                        }
-                        coveringSub = actualIndex->readDistanceToParent(idxSub)
-                                + actualIndex->readCoveringRadius(idxSub);
-                    }
-                    pageIdSub = actualIndex->getPageId();
+				level--;
+			}
 
-                    averageForAdd->incrementVerification(actualIndex->getCalculatedDistance());
-                    //clean home
-                    delete actualIndex;
-                    //update actual
-                    actualIndex = parentIndex;
-                    level--;
-                }
-                //clean home
-                delete actualIndex;
-            }
             if (promote == true) {
-                //promote
-                RTreeIndex<K> * newRoot = new RTreeIndex<K>(se->create());
-                newRoot->addKey(objPromote->getFirstKey(), DBL_MAX, objPromote->getFistSubPageId(), objPromote->getFirstCoveringRadius());
-                newRoot->addKey(objPromote->getSecondKey(), DBL_MAX, objPromote->getSecondSubPageId(), objPromote->getSecondCoveringRadius());
-                // Circularly link
-                newRoot->writePreviousPageId(newRoot->getPageId());
-                newRoot->writeNextPageId(newRoot->getPageId());
-                //ajust rootPageId
-                descriptor->writeRootPageId(newRoot->getPageId());
-                descriptor->incTreeHeight();
-
-                averageForAdd->incrementVerification(newRoot->getCalculatedDistance());
-                delete newRoot;
-            }
+				// Promote
+				newIndex = new RTreeIndex<K>(se->create());
+				newIndex->addKey(objPromote->getFirstKey(), objPromote->getFistSubPageId());
+				newIndex->addKey(objPromote->getSecondKey(), objPromote->getSecondSubPageId());
+				// Circularly link
+				newIndex->writePreviousPageId(newIndex->getPageId());
+				newIndex->writeNextPageId(newIndex->getPageId());
+				//ajust rootPageId
+				descriptor->writeRootPageId(newIndex->getPageId());
+				descriptor->incTreeHeight();
+			}
             //clean home
             delete objPromote;
         }
-        averageForAdd->incrementVerification(leaf->getCalculatedDistance());
         //clean home
         delete [] path;
         delete leaf;
@@ -290,6 +233,8 @@ Bool RTree<K>::add(K * key) {
     //statistic for add
     diskAccess = se->getBlockAccess() - diskAccess;
     averageForAdd->incrementDiskAccess(diskAccess);
+    verifications = this->geometry->getCalculatedOverlap() - verifications;
+    averageForAdd->incrementVerification(verifications);
     //clean home
     delete descriptor;
     se->close();
@@ -335,7 +280,7 @@ RTreePromotion<K> * RTree<K>::splitIndex(Session * se,
     K ** vecKey = new K*[total];
 	Long * vecSub = new Long[total];
     for (i = 0; i < total - 1; i++) {
-    	vecSub[i] = fullIndex->buildKey(i);
+    	vecKey[i] = fullIndex->buildKey(i);
     	vecSub[i] = fullIndex->readSubPageId(i);
 	}//endfor
     vecKey[i] = key;
@@ -361,6 +306,8 @@ RTreePromotion<K> * RTree<K>::splitIndex(Session * se,
 				idx1 = i;
 				idx2 = j;
 			}
+			// clean home
+			delete mbrUnion;
 		}
 	}
 
@@ -385,10 +332,20 @@ RTreePromotion<K> * RTree<K>::splitIndex(Session * se,
 				if (!fullIndex->addKey(vecKey[i], vecSub[i])) {
 					throw runtime_error("add fail");
 				}
+				//clean home
+				delete union2;
+				if (objPromote->getFirstKey() != NULL) {
+					delete objPromote->getFirstKey();
+				}
 				objPromote->setFirstKey(union1);
 			} else if (ocup1 > ocup2) {
 				if (!newIndex->addKey(vecKey[i], vecSub[i])) {
 					throw runtime_error("add fail");
+				}
+				//clean home
+				delete union1;
+				if (objPromote->getSecondKey() != NULL) {
+					delete objPromote->getSecondKey();
 				}
 				objPromote->setSecondKey(union2);
 			} else {
@@ -398,35 +355,65 @@ RTreePromotion<K> * RTree<K>::splitIndex(Session * se,
 					if (!fullIndex->addKey(vecKey[i], vecSub[i])) {
 						throw runtime_error("add fail");
 					}
+					//clean home
+					delete union2;
+					if (objPromote->getFirstKey() != NULL) {
+						delete objPromote->getFirstKey();
+					}
 					objPromote->setFirstKey(union1);
 				} else if (ocupProm1 > ocupProm2) {
 					if (!newIndex->addKey(vecKey[i], vecSub[i])) {
 						throw runtime_error("add fail");
 					}
+					//clean home
+					delete union1;
+					if (objPromote->getSecondKey() != NULL) {
+						delete objPromote->getSecondKey();
+					}
 					objPromote->setSecondKey(union2);
 				} else {
-					double dist1 = objPromote->getFirstKey().distanceTo(vecKey[i]);
-					double dist2 = objPromote->getSecondKey().distanceTo(vecKey[i]);
+					double dist1 = objPromote->getFirstKey()->distanceTo(vecKey[i]);
+					double dist2 = objPromote->getSecondKey()->distanceTo(vecKey[i]);
 			        averageForAdd->incrementVerification(2);
 
 					if (dist1 < dist2) {
 						if (!fullIndex->addKey(vecKey[i], vecSub[i])) {
 							throw runtime_error("add fail");
 						}
+						//clean home
+						delete union2;
+						if (objPromote->getFirstKey() != NULL) {
+							delete objPromote->getFirstKey();
+						}
 						objPromote->setFirstKey(union1);
 					} else if (dist1 > dist2) {
 						if (!newIndex->addKey(vecKey[i], vecSub[i])) {
 							throw runtime_error("add fail");
+						}
+						//clean home
+						delete union1;
+						if (objPromote->getSecondKey() != NULL) {
+							delete objPromote->getSecondKey();
 						}
 						objPromote->setSecondKey(union2);
 					} else if (fullIndex->readNumberOfKeys() <= newIndex->readNumberOfKeys()) {
 						if (!fullIndex->addKey(vecKey[i], vecSub[i])) {
 							throw runtime_error("add fail");
 						}
+						//clean home
+						delete union2;
+						if (objPromote->getFirstKey() != NULL) {
+							delete objPromote->getFirstKey();
+						}
 						objPromote->setFirstKey(union1);
 					} else {
 						if (!newIndex->addKey(vecKey[i], vecSub[i])) {
 							throw runtime_error("add fail");
+						}
+						//clean home
+						delete union1;
+						if (objPromote->getSecondKey() != NULL) {
+							delete objPromote->getSecondKey();
 						}
 						objPromote->setSecondKey(union2);
 					}
@@ -442,7 +429,7 @@ RTreePromotion<K> * RTree<K>::splitIndex(Session * se,
     newIndex->writePreviousPageId(fullIndex->getPageId());
     Long nextPageId = newIndex->readNextPageId();
     if (nextPageId != fullIndex->getPageId()) {
-    	RTreeIndex<K> nextIndex = new RTreeIndex<K>(se->load(nextPageId));
+    	RTreeIndex<K> * nextIndex = new RTreeIndex<K>(se->load(nextPageId));
         nextIndex->writePreviousPageId(newIndex->getPageId());
         delete nextIndex;
     } else {
@@ -460,7 +447,7 @@ RTreePromotion<K> * RTree<K>::splitIndex(Session * se,
 //----------------------------------------------------------------------
 
 template <typename K>
-RTreePromotion<K> * RTree<K>::splitLeaf(Session * se, RTreeLeaf<K> * fullLeaf, RTreeLeaf<K> newLeaf, K * key, Uuid * uuid) {
+RTreePromotion<K> * RTree<K>::splitLeaf(Session * se, RTreeLeaf<K> * fullLeaf, RTreeLeaf<K> * newLeaf, K * key, Uuid * uuid) {
 
     Int i, j;
     Int total = fullLeaf->readNumberOfKeys() + 1;
@@ -500,6 +487,7 @@ RTreePromotion<K> * RTree<K>::splitLeaf(Session * se, RTreeLeaf<K> * fullLeaf, R
 				idx1 = i;
 				idx2 = j;
 			}
+			// clean home
 			delete mbrUnion;
 		}
 	}
@@ -525,10 +513,20 @@ RTreePromotion<K> * RTree<K>::splitLeaf(Session * se, RTreeLeaf<K> * fullLeaf, R
 				if (!fullLeaf->addKey(vecKey[i], vecUuid[i])) {
 					throw runtime_error("add fail");
 				}
+				//clean home
+				delete union2;
+				if (objPromote->getFirstKey() != NULL) {
+					delete objPromote->getFirstKey();
+				}
 				objPromote->setFirstKey(union1);
 			} else if (ocup1 > ocup2) {
 				if (!newLeaf->addKey(vecKey[i], vecUuid[i])) {
 					throw runtime_error("add fail");
+				}
+				//clean home
+				delete union1;
+				if (objPromote->getSecondKey() != NULL) {
+					delete objPromote->getSecondKey();
 				}
 				objPromote->setSecondKey(union2);
 			} else {
@@ -538,10 +536,20 @@ RTreePromotion<K> * RTree<K>::splitLeaf(Session * se, RTreeLeaf<K> * fullLeaf, R
 					if (!fullLeaf->addKey(vecKey[i], vecUuid[i])) {
 						throw runtime_error("add fail");
 					}
+					//clean home
+					delete union2;
+					if (objPromote->getFirstKey() != NULL) {
+						delete objPromote->getFirstKey();
+					}
 					objPromote->setFirstKey(union1);
 				} else if (ocupProm1 > ocupProm2) {
 					if (!newLeaf->addKey(vecKey[i], vecUuid[i])) {
 						throw runtime_error("add fail");
+					}
+					//clean home
+					delete union1;
+					if (objPromote->getSecondKey() != NULL) {
+						delete objPromote->getSecondKey();
 					}
 					objPromote->setSecondKey(union2);
 				} else {
@@ -553,20 +561,40 @@ RTreePromotion<K> * RTree<K>::splitLeaf(Session * se, RTreeLeaf<K> * fullLeaf, R
 						if (!fullLeaf->addKey(vecKey[i], vecUuid[i])) {
 							throw runtime_error("add fail");
 						}
+						//clean home
+						delete union2;
+						if (objPromote->getFirstKey() != NULL) {
+							delete objPromote->getFirstKey();
+						}
 						objPromote->setFirstKey(union1);
 					} else if (dist1 > dist2) {
 						if (!newLeaf->addKey(vecKey[i], vecUuid[i])) {
 							throw runtime_error("add fail");
+						}
+						//clean home
+						delete union1;
+						if (objPromote->getSecondKey() != NULL) {
+							delete objPromote->getSecondKey();
 						}
 						objPromote->setSecondKey(union2);
 					} else if (fullLeaf->readNumberOfKeys() <= newLeaf->readNumberOfKeys()) {
 						if (!fullLeaf->addKey(vecKey[i], vecUuid[i])) {
 							throw runtime_error("add fail");
 						}
+						//clean home
+						delete union2;
+						if (objPromote->getFirstKey() != NULL) {
+							delete objPromote->getFirstKey();
+						}
 						objPromote->setFirstKey(union1);
 					} else {
 						if (!newLeaf->addKey(vecKey[i], vecUuid[i])) {
 							throw runtime_error("add fail");
+						}
+						//clean home
+						delete union1;
+						if (objPromote->getSecondKey() != NULL) {
+							delete objPromote->getSecondKey();
 						}
 						objPromote->setSecondKey(union2);
 					}
@@ -584,7 +612,7 @@ RTreePromotion<K> * RTree<K>::splitLeaf(Session * se, RTreeLeaf<K> * fullLeaf, R
 	newLeaf->writePreviousPageId(fullLeaf->getPageId());
 	long nextPageId = newLeaf->readNextPageId();
 	if (nextPageId != fullLeaf->getPageId()) {
-		RTreeLeaf<K> nextLeaf = new RTreeLeaf<K>(se->load(nextPageId)); //, this->getObjectClass()
+		RTreeLeaf<K> * nextLeaf = new RTreeLeaf<K>(se->load(nextPageId)); //, this->getObjectClass()
 		nextLeaf->writePreviousPageId(newLeaf->getPageId());
 		delete nextLeaf;
 	} else {

@@ -42,6 +42,8 @@ public:
 	virtual Int numberOfDimensions() = 0;
 	virtual void setOrigin(Int axis, Double value) = 0;
 	virtual void setExtension(Int axis, Double value) = 0;
+	virtual Uuid* getUuid() = 0;
+	virtual void setUuid(Uuid *uuid) = 0;
 };
 
 template <typename K>

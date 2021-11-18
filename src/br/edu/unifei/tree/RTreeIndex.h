@@ -19,70 +19,69 @@ namespace edu {
 namespace unifei {
 namespace tree {
 
-template <typename K>
+template<typename K>
 class MTree;
 
 using namespace std;
 
-template <typename K>
-class RTreeIndex : public RTreeNode<K>{
+template<typename K>
+class RTreeIndex: public RTreeNode<K> {
 private:
-    static const Int nodeType = 9;
+	static const Int nodeType = 9;
 
 protected:
 
-    Int getNodeType() {
-        return nodeType;
-    }//getNodeType
+	Int getNodeType() {
+		return nodeType;
+	} //getNodeType
 
-    Int sizeOfEntry() {
-        return Node::sizeOfLong + Node::sizeOfDouble + Node::sizeOfDouble + Node::sizeOfInt;
-    }//sizeOfEntry
+	Int sizeOfEntry() {
+		return Node::sizeOfLong + Node::sizeOfDouble + Node::sizeOfDouble
+				+ Node::sizeOfInt;
+	} //sizeOfEntry
 
-    void writeSubPageId(Int idx, Long pageId);
+	void writeSubPageId(Int idx, Long pageId);
 
 public:
 
-    RTreeIndex(Node * node) : RTreeNode<K>(node) {
-        static_assert(is_base_of<Metric<K>, K>::value, "Generic type is not derived of the Order class");
-        this->initialize(node);
-    }
+	RTreeIndex(Node *node) :
+			RTreeNode<K>(node) {
+		static_assert(is_base_of<Metric<K>, K>::value, "Generic type is not derived of the Order class");
+		this->initialize(node);
+	}
 
-    virtual ~RTreeIndex() {
-    }
+	virtual ~RTreeIndex() {
+	}
 
-    Bool addKey(K * key, Long subPageId);
+	Bool addKey(K *key, Long subPageId);
 
-    Bool addKey(K * key1, Long subPageId1, K * key2, Long subPageId2);
+	Bool addKey(K *key1, Long subPageId1, K *key2, Long subPageId2);
 
-    Int indexOfInsertion(K * key, EuclideanGeometry<K> * geometry);
+	Int indexOfInsertion(K *key, EuclideanGeometry<K> *geometry);
 
-    Int indexOfSubPageId(Long pageId);
+	Int indexOfSubPageId(Long pageId);
 
-    static Bool matchNodeType(Node * node) {
-        return node->readNodeType() == RTreeIndex<K>::nodeType;
-    }//matchNodeType
+	static Bool matchNodeType(Node *node) {
+		return node->readNodeType() == RTreeIndex<K>::nodeType;
+	} //matchNodeType
 
-    Long readSubPageId(Int idx);
+	Long readSubPageId(Int idx);
 
-    void replace(int idx, K * key);
+	void replace(int idx, K *key);
 
 };
 
-
 //----------------------------------------------------------------------
 
-template <typename K>
-Bool RTreeIndex<K>::addKey(K * key, Long subPageId) {
+template<typename K>
+Bool RTreeIndex<K>::addKey(K *key, Long subPageId) {
 	Int total = this->readNumberOfKeys();
 	Int size = key->sizeOfKey();
 
 	if (size + this->sizeOfEntry() > this->freeSpace(size)) // It there is not space.
-	{
+			{
 		return false;
-	}
-	else
-	{
+	} else {
 		int off = this->getOffset(total, size);
 		key->pushKey(this->getArray(), off); // Adding
 		this->writeSubPageId(total, subPageId);
@@ -90,123 +89,113 @@ Bool RTreeIndex<K>::addKey(K * key, Long subPageId) {
 
 		return true;
 	}
-}//addKey
+} //addKey
 
 //----------------------------------------------------------------------
 
-template <typename K>
-Bool RTreeIndex<K>::addKey(K * key1, Long subPageId1, K * key2, Long subPageId2) {
+template<typename K>
+Bool RTreeIndex<K>::addKey(K *key1, Long subPageId1, K *key2, Long subPageId2) {
 	Int size = key1->sizeOfKey();
 
-	if (size + size + 2 * this->sizeOfEntry() > this->freeSpace(size))
-	{
+	if (size + size + 2 * this->sizeOfEntry() > this->freeSpace(size)) {
 		return false;
-	}
-	else
-	{
+	} else {
 		addKey(key1, subPageId1);
 		addKey(key2, subPageId2);
 		return true;
 	}
-}//addKey
+} //addKey
 
 //----------------------------------------------------------------------
 
-template <typename K>
-Int RTreeIndex<K>::indexOfInsertion(K * key, EuclideanGeometry<K> * geometry) {
-    Double distIn = DBL_MAX; // Minimum distance if key is inside some obj covering radius.
-    Double distOut = DBL_MAX; // Minimum distance if key is outside some obj covering radius.
-    Double newCoverage = DBL_MAX;
-    Int idxIn = 0; // Index of obj in which key has minimum distance (inside cov rad).
-    Int idxOut = 0; // Index of obj in which key has minimum distance (outside cov rad).
-    Bool in = false; // Weather key is inside some cov rad.
-    Int total = this->readNumberOfKeys();
+template<typename K>
+Int RTreeIndex<K>::indexOfInsertion(K *key, EuclideanGeometry<K> *geometry) {
+	Int total = this->readNumberOfKeys(); // Number of keys in node
+	Double minOccupancy = DBL_MAX; // Minimum occupancy (area, volume...) of MBR.
+	Double minEnlargement = DBL_MAX; // Minimum enlargement of occupancy (area, volume...) of MBR.
+	Int idx = -1; // Qualified sub page
+	K *storedKey; // To build keys stored into this node.
+	K *newMbr = NULL;
+	for (int i = 0; i < total; i++) {
+		storedKey = this->buildKey(i);
 
-    for (Int i = 0; i < total; i++) {
-        K * storedKey = this->buildKey(i); // Key stored in the node.
+		// Calc occupancy of stored key
+		Double befOcup = geometry->occupancy(storedKey); // Occupancy (area, volume...) BEFORE enlargement.
+		K *mbrUnion = geometry->unionRectangles(key, storedKey); // Enlargment
+		Double aftOcup = geometry->occupancy(mbrUnion); // Occupancy (area, volume...) AFTER enlargement.
 
-        Double rad = this->readCoveringRadius(i); // storedKey cov rad: r(Or)
-
-        this->calculatedDistance++;
-        Double dist = storedKey->distanceTo(key); // Distance from key to storedKey: d(Or, On)
-
-        if (in) {
-            //exists a radii covering
-            if (dist <= rad && dist < distIn) // Looking for minimum distance.
-            {
-                //these radius too cover and is less
-                distIn = dist; // Minimum distance between storedKey and key.
-                idxIn = i; // storedKey in which distance to key is minimum.
-            }
-        } else {
-            //does not exists a radii covering
-            if (dist <= rad) // key is inside storedKey covering radius.
-            {
-                //these radius cover
-                in = true; // !in to set true once.
-                distIn = dist; // Minimum distance between storedKey and key.
-                idxIn = i; // storedKey in which distance to key is minimum.
-            } else {
-                //these radius does not cover
-                if (dist - rad < distOut) // If key is outside any storedKey cov rad
-                {
-                    //minimize distOut
-                    distOut = dist - rad; // Minimum enlargement of cov rad.
-                    idxOut = i; // storedKey to minimum cov rad enlargement.
-                    newCoverage = dist;
-                }
-            }
-        }
-        //clean home
-        delete storedKey;
-    }
-
-    if (in) // Key is inside entry[idxIn] covering radius and the distance is minimum
-    {
-        return idxIn;
-    } else // No entry cov rad contains key.
-    {
-        // Increase the most suitable (minimum enlargement) entry cov rad.
-        //this.writeCoveringRadius(idxOut, this.readCoveringRadius(idxOut) + distOut);
-        this->writeCoveringRadius(idxOut, newCoverage + MTree<K>::precisionError);
-        return idxOut;
-    }
-}//indexOfInsertion
+		Double enlarg = aftOcup - befOcup; // Enlargement of occupancy
+		// Qualifies key with minimum enlargement. Resolve ties selecting minimum occupancy (area, volume...)
+		if (enlarg < minEnlargement) {
+			minEnlargement = enlarg;
+			minOccupancy = befOcup;
+			idx = i; // Qualify
+			//clean home
+			if (newMbr != NULL) {
+				delete newMbr;
+			}
+			newMbr = mbrUnion;
+		} else if (enlarg == minEnlargement && befOcup < minOccupancy) {
+			minOccupancy = befOcup;
+			idx = i; // Qualify
+			//clean home
+			if (newMbr != NULL) {
+				delete newMbr;
+			}
+			newMbr = mbrUnion;
+		}
+		//clean home
+		delete storedKey;
+	}
+	// If MBR was enlarged:
+	if (minEnlargement != 0) {
+		// Writes enlargement
+		newMbr->pushKey(this->getArray(),
+				this->getOffset(idx, newMbr->sizeOfKey()));
+	}
+	//clean home
+	if (newMbr != NULL) {
+		delete newMbr;
+	}
+	return idx;
+} //indexOfInsertion
 
 //----------------------------------------------------------------------
 
-template <typename K>
+template<typename K>
 Int RTreeIndex<K>::indexOfSubPageId(Long pageId) {
-    Int total = this->readNumberOfKeys();
-    for (Int i = 0; i < total; i++) {
-        if (this->readSubPageId(i) == pageId) {
-            return i;
-        }
-    }
+	Int total = this->readNumberOfKeys();
+	for (Int i = 0; i < total; i++) {
+		if (this->readSubPageId(i) == pageId) {
+			return i;
+		}
+	}
 
-    return -1;
-}//indexOfSubPageId
+	return -1;
+} //indexOfSubPageId
 
 //----------------------------------------------------------------------
 
-template <typename K>
+template<typename K>
 Long RTreeIndex<K>::readSubPageId(Int idx) {
-    Int pos = Node::sizeOfHeader() + this->sizeOfFeatures() + (idx * this->sizeOfEntry());
-    return this->readLong(pos);
-}//readSubPageId
+	Int pos = Node::sizeOfHeader() + this->sizeOfFeatures()
+			+ (idx * this->sizeOfEntry());
+	return this->readLong(pos);
+} //readSubPageId
 
 //----------------------------------------------------------------------
 
-template <typename K>
+template<typename K>
 void RTreeIndex<K>::writeSubPageId(Int idx, Long pageId) {
-    Int pos = Node::sizeOfHeader() + this->sizeOfFeatures() + (idx * this->sizeOfEntry());
-    this->writeLong(pos, pageId);
-}//writeSubPageId
+	Int pos = Node::sizeOfHeader() + this->sizeOfFeatures()
+			+ (idx * this->sizeOfEntry());
+	this->writeLong(pos, pageId);
+} //writeSubPageId
 
 //----------------------------------------------------------------------
 
-template <typename K>
-void RTreeIndex<K>::replace(int idx, K * key){
+template<typename K>
+void RTreeIndex<K>::replace(int idx, K *key) {
 	int off = this->getOffset(idx, key->sizeOfKey());
 	key->pushKey(this->getArray(), off);
 }
@@ -215,6 +204,5 @@ void RTreeIndex<K>::replace(int idx, K * key){
 } /* namespace unifei */
 } /* namespace edu */
 } /* namespace br */
-
 
 #endif /* BR_EDU_UNIFEI_TREE_RTREEINDEX_H_ */

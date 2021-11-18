@@ -92,7 +92,6 @@ Bool RTreeLeaf<K>::addKey(K * key, Uuid * uuid) {
     } else {
         Int off = this->getOffset(total, size);
         key->pushKey(this->getArray(), off); // Adding
-        this->writeOffset(total, off);
         this->writeEntityUuid(total, uuid);
         this->incrementNumberOfKeys();
 

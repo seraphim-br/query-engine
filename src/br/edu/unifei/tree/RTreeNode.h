@@ -145,8 +145,9 @@ Int RTreeNode<K>::indexOfKey(K * key) {
 	    {
 		return i;
 	    }
+	    //clean home
+		delete objKey;
 	}
-        delete objKey;
 
 	return -1;
 }//indexOfKey
