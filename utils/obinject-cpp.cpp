@@ -33,9 +33,6 @@ Int main(Int argc, char **argv) {
 		File *fileMtree = new File("../data/geonet.mtree");
 		MTree<Point> *mtree = new MTree<Point>(fileMtree);
 
-		File *fileRtree = new File("../data/geonet.rtree");
-		RTree<PointRTree> *rtree = new MTree<Point>(fileRtree);
-
 		KFarthest<Point> *kfar = new KFarthest<Point>(mtree);
 		KFarthestNearest<Point> *kfarNear = new KFarthestNearest<Point>(mtree);
 

@@ -9,6 +9,7 @@
 #define BR_EDU_UNIFEI_TREE_PUNCTUAL_H_
 
 #include <br/edu/unifei/tree/AveragePerformance.h>
+#include <br/edu/unifei/tree/Qualify.h>
 #include <br/edu/unifei/tree/Session.h>
 #include <br/edu/unifei/tree/Uuid.h>
 #include <type_traits>
@@ -110,7 +111,7 @@ public:
 	                    storedKey = leaf->buildKey(i);
 	                    performance->incrementVerification(2);
 	                    dist = object->distanceTo(storedKey);
-	                    if ((dist == 0) && (storedKey->distanceTo(object) == 0)) {
+	                    if (dist == 0) {
 	                        uuidFinded = leaf->readEntityUuid(i);
 	                        //clean home
 	                        delete storedKey;
@@ -131,6 +132,7 @@ public:
 	        //free each block after use
 	        se->close();
 	    } while ((!qualifies.empty()) &&(uuidFinded == NULL));
+	    //clean home
 	    while(!qualifies.empty()){
 	        objQualify = qualifies.top();
 	        qualifies.pop();

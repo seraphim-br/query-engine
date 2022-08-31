@@ -57,6 +57,10 @@ public:
 		delete performance;
 	}
 
+	AveragePerformance* getPerformance() const {
+		return performance;
+	}
+
 	Collection * execute(K * object, Int k){
 		steady_clock::time_point t1 = steady_clock::now();
 		Long pageId;
@@ -146,6 +150,7 @@ public:
 									// update range
 									if (!result->empty()) {
 										range = result->top()->getPreservedDistance();
+//										cout << "range = " << range << endl;
 									}
 								}
 							}else{

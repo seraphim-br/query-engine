@@ -1,0 +1,26 @@
+
+obj // obj=objeto consulta
+k // quantidade de resultado da consulta
+result // resposta da consulta ordenada decrecente
+heapQuali // n?s da Mtree a serem verificados
+maiorDist<-0 // maior distancia em resultado
+verticeMaisDistante<-0 //maior distancia entre o objeto e os vertices do retangulo
+
+enquanto !heapQuali.empty()
+  RTreeNode node <- heapQuali.pop()
+  se(node->type == RTreeIndex)
+    para cada entrada em node
+      verticeMaisDistante <- 0
+      para cada vertice da entrada
+        se dist(vertice, obj) > maiorDist
+          verticeMaisDistante <- dist(vertice, obj)
+      se verticeMaisDistante >= maiorDist
+         heapQuali.pull(entrada)
+	else
+      //RtreeLeaf
+      para cada entrada em node
+        se dist(entrada, obj) >= maiorDist
+          result.add(entrada)
+		  se result.size > k
+            result.removeUltimos()
+			maiorDist<-result.lastDistance()

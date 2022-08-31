@@ -1,0 +1,18 @@
+seqList //seqList=lista completa dos objetos
+obj // obj=objeto consulta
+k // quantidade de resultado da consulta
+result //  resposta  da  consulta  ordenada  crescente  pela  distancia  para o objeto de  consulta
+maiorDist<-0 // maior distancia em resultado
+primObjInx<-indicePrimeiroObjetoLista // inicio da lista
+atualObjIdx<-indicePrimeiroObjetoLista // objeto a ser analisado
+
+faça
+    SequencialNode node <- SeqList[atualObjIdx]
+    para cada entrada em node
+        se dist(entrada, obj) >= maiorDist
+            result.add(entrada)
+            se result.size > k
+                result.removeMaisProximos()
+            maiorDist<-result.lastDistance()
+    atualObjIdx <- atualObjIdx.next()
+enquanto primObjInx != objAtualIdx

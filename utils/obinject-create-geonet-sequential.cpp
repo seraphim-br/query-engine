@@ -8,8 +8,7 @@
 #include <br/edu/unifei/tree/File.h>
 #include <br/edu/unifei/tree/MTree.h>
 #include <br/edu/unifei/tree/RTree.h>
-#include <br/edu/unifei/tree/Punctual.h>
-#include <br/edu/unifei/tree/KFarthest.h>
+#include <br/edu/unifei/tree/Sequential.h>
 #include <br/edu/unifei/tree/Point.h>
 
 using namespace br::edu::unifei::tree;
@@ -30,21 +29,18 @@ Int main(Int argc, char **argv) {
 
 	fstream fileStream;
 	fileStream.open("../data/geonet.txt");
-	// if exists mtree
 	cout << "Ponto 3";
 	if (!fileStream.fail()) {
-		//creating mtree
-//		File *fileMTreeNew = new File("../data/geonet.mtree", 8192);
-//		MTree<Point> *mtreeNew = new MTree<Point>(fileMTreeNew);
-//		Punctual<Point> *punct = new Punctual<Point>(mtreeNew);
-		cout << "Começa aqui";
+		//creating sequential
+		cout << "Comeï¿½a aqui";
 
-		File *fileRTreeNew = new File("../data/geonet.rtree", 8192);
-		RTree<PointRTree> *rtreeNew = new RTree<PointRTree>(fileRTreeNew);
+		File *fileSeqNew = new File("../data/geonet.sequential", 8192);
+		Sequential<Point> *seqNew = new Sequential<Point>(fileSeqNew);
 
 		while (ifs.getline(buf, 1023)) {
 			if (strlen(buf) > 0) {
 				tab = buf;
+
 				//lat
 				tab = strchr(tab, '\t');
 				nextTab = strchr(tab, '\t');
@@ -59,38 +55,23 @@ Int main(Int argc, char **argv) {
 				float lon = atof(tab);
 
 				//point
-//				Point *pIns = new Point();
-//				pIns->setLatitude(lat);
-//				pIns->setLongitude(lon);
-//				mtreeNew->add(pIns);
+				Point *pIns = new Point();
+				pIns->setLatitude(lat);
+				pIns->setLongitude(lon);
+				seqNew->add(pIns);
 
-//				Uuid *uuidFind = punct->execute(pIns);
-//				if (uuidFind == NULL) {
-//					cout << "FAIL IN INSERTION: lat=" << pIns->getLatitude()
-//							<< " Long=" << pIns->getLongitude() << endl;
-//				}
-
-				//pointTTree
-				PointRTree *pRtree = new PointRTree();
-				pRtree->setOrigin(0, lat);
-				pRtree->setOrigin(1, lon);
-				rtreeNew->add(pRtree);
 				i++;
 				if (i%100 == 0){
 					cout << ".";
 				}
 
 				//clean home
-				delete pRtree;
-//				delete uuidFind;
-//				delete pIns;
+				delete pIns;
 			}
 		}
 		//clean home
-//		delete fileMTreeNew;
-//		delete mtreeNew;
-		delete fileRTreeNew;
-		delete rtreeNew;
+		delete fileSeqNew;
+		delete seqNew;
 	} else {
 		//clean home
 		fileStream.close();

@@ -43,7 +43,7 @@ public:
 	class ReverseComparable{
 	public:
 		bool operator() (Metric<K> * o1, Metric<K> * o2) {
-			return o1->getPreservedDistance() > o2->getPreservedDistance();
+			return o1->getPreservedDistance() >= o2->getPreservedDistance();
 		}
 	};
 
@@ -149,10 +149,7 @@ public:
 											}
 										}
 									}
-									// update range
-									if (!result->empty()) {
-										range = result->top()->getPreservedDistance();
-									}
+									range = result->top()->getPreservedDistance();
 								}
 							}else{
 								delete build;

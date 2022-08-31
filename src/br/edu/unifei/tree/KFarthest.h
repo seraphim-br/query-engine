@@ -1,10 +1,3 @@
-/*
- * KFarthest.h
- *
- *  Created on: 1 de out de 2019
- *      Author: windows
- */
-
 #ifndef BR_EDU_UNIFEI_TREE_KFARTHEST_H_
 #define BR_EDU_UNIFEI_TREE_KFARTHEST_H_
 
@@ -141,6 +134,7 @@ public:
 												result->push(obj);
 											}
 										}else{
+											//clean home
 											while (!repetedList.empty()){
 												K * obj = repetedList.front();
 												repetedList.pop_front();
@@ -148,10 +142,7 @@ public:
 											}
 										}
 									}
-									// update range
-									if (!result->empty()) {
-										range = result->top()->getPreservedDistance();
-									}
+									range = result->top()->getPreservedDistance();
 								}
 							}else{
 								delete build;

@@ -143,6 +143,8 @@ Int RTreeIndex<K>::indexOfInsertion(K *key, EuclideanGeometry<K> *geometry) {
 				delete newMbr;
 			}
 			newMbr = mbrUnion;
+		} else {
+			delete mbrUnion;
 		}
 		//clean home
 		delete storedKey;

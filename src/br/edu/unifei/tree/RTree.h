@@ -180,6 +180,7 @@ Bool RTree<K>::add(K * key) {
             //split leaf
 
 			RTreePromotion<K> *objPromote = this->splitLeaf(se, leaf, newLeaf, key, key->getUuid());
+			RTreePromotion<K> * objIndexPromote;
 
 			level = pathLength - 1;
 
@@ -192,19 +193,24 @@ Bool RTree<K>::add(K * key) {
 					index->replace(idxReplc, objPromote->getFirstKey());
 
 					if (index->addKey(objPromote->getSecondKey(), objPromote->getSecondSubPageId())) {
+
 						promote = false;
 					} else {
 						newIndex = new RTreeIndex<K>(se->create());
-						objPromote = this->splitIndex(se, index, newIndex, objPromote->getSecondKey(), objPromote->getSecondSubPageId());
+						objIndexPromote = this->splitIndex(se, index, newIndex, objPromote->getSecondKey(), objPromote->getSecondSubPageId());
 //						nodeLeft = index;
 //						nodeRight = newIndex;
 						pageIdRem = node->getPageId();
 						promote = true;
-
 						//clean home
-			            delete newIndex; //nao sei
+						delete objPromote;
+			            delete newIndex;
+						//update objPromote
+						objPromote = objIndexPromote;
 
 					}
+					//clean home
+		            delete index;
 				}
 
 				level--;
@@ -277,6 +283,11 @@ RTreePromotion<K> * RTree<K>::splitIndex(Session * se,
     Int i, j;
     Int total = fullIndex->readNumberOfKeys() + 1;
 
+    K * objRep1;
+	K * objRep2;
+	Byte * serialRep1;
+	Byte * serialRep2;
+
     K ** vecKey = new K*[total];
 	Long * vecSub = new Long[total];
     for (i = 0; i < total - 1; i++) {
@@ -311,6 +322,17 @@ RTreePromotion<K> * RTree<K>::splitIndex(Session * se,
 		}
 	}
 
+	//copy representative 1
+	objRep1 = new K();
+	serialRep1 = new Byte[vecKey[idx1]->sizeOfKey()];
+	vecKey[idx1]->pushKey(serialRep1, 0);
+	objRep1->pullKey(serialRep1, 0);
+	//copy representative 2
+	objRep2 = new K();
+	serialRep2 = new Byte[vecKey[idx2]->sizeOfKey()];
+	vecKey[idx2]->pushKey(serialRep2, 0);
+	objRep2->pullKey(serialRep2, 0);
+
 	//cleanning fullIndex and inserting vecKey[idx1]
 	fullIndex->clear();
 	fullIndex->addKey(vecKey[idx1], vecSub[idx1]);
@@ -320,7 +342,7 @@ RTreePromotion<K> * RTree<K>::splitIndex(Session * se,
 	newIndex->addKey(vecKey[idx2], vecSub[idx2]);
 
 	//promoted MBR
-	objPromote = new RTreePromotion<K>(vecKey[idx1], fullIndex->getPageId(), vecKey[idx2], newIndex->getPageId());
+	objPromote = new RTreePromotion<K>(objRep1, fullIndex->getPageId(), objRep2, newIndex->getPageId());
 	for (i = 0; i < total; i++) {
 		if (!(i == idx1 || i == idx2)) {
 			K * union1 = geometry->unionRectangles(objPromote->getFirstKey(), vecKey[i]);
@@ -436,11 +458,14 @@ RTreePromotion<K> * RTree<K>::splitIndex(Session * se,
         fullIndex->writePreviousPageId(newIndex->getPageId());
     }
     // clear home
-	for (i = 0; i < total; i++) {
+	for (i = 0; i < total - 1 ; i++) {
 		delete vecKey[i];
 	}//endfor
 	delete [] vecSub;
 	delete [] vecKey;
+	//clean home
+    delete [] serialRep1;
+    delete [] serialRep2;
     return objPromote;
 }//splitIndex
 
@@ -455,11 +480,18 @@ RTreePromotion<K> * RTree<K>::splitLeaf(Session * se, RTreeLeaf<K> * fullLeaf, R
     //copy all keys and subPageId
 	Uuid ** vecUuid = new Uuid*[total];
 	K ** vecKey = new K*[total];
+
+	K * objRep1;
+	K * objRep2;
+	Byte * serialRep1;
+	Byte * serialRep2;
+
 	//coping key and subPageId
 	for (i = 0; i < total - 1; i++) {
 		vecKey[i] = fullLeaf->buildKey(i);
 		vecUuid[i] = fullLeaf->readEntityUuid(i);
 	}//endfor
+
 	//copy key and pageId in the correct position
 	vecKey[i] = key;
 	//copy the pageId in the correct position
@@ -492,6 +524,17 @@ RTreePromotion<K> * RTree<K>::splitLeaf(Session * se, RTreeLeaf<K> * fullLeaf, R
 		}
 	}
 
+    //copy representative 1
+	objRep1 = new K();
+	serialRep1 = new Byte[vecKey[idx1]->sizeOfKey()];
+	vecKey[idx1]->pushKey(serialRep1, 0);
+	objRep1->pullKey(serialRep1, 0);
+	//copy representative 2
+	objRep2 = new K();
+	serialRep2 = new Byte[vecKey[idx2]->sizeOfKey()];
+	vecKey[idx2]->pushKey(serialRep2, 0);
+	objRep2->pullKey(serialRep2, 0);
+
     //cleanning fullIndex and inserting vecKey[idx1]
 	fullLeaf->clear();
 	fullLeaf->addKey(vecKey[idx1], vecUuid[idx1]);
@@ -499,7 +542,17 @@ RTreePromotion<K> * RTree<K>::splitLeaf(Session * se, RTreeLeaf<K> * fullLeaf, R
 	newLeaf->clear();
 	newLeaf->addKey(vecKey[idx2], vecUuid[idx2]);
 	//promoted MBR
-	objPromote = new RTreePromotion<K>(vecKey[idx1], fullLeaf->getPageId(), vecKey[idx2], newLeaf->getPageId());
+	objPromote = new RTreePromotion<K>(objRep1, fullLeaf->getPageId(), objRep2, newLeaf->getPageId());
+
+
+//	selecionar dois objs com maior ocupancia para subir
+//	cria mais um leaf
+//	dividir os objetos que sobrou entre os dois leafs (
+//	criterio1: menor ocupancia da uniao do obj a ser inserido e o promovido;
+//	criterio2: menor ocupancia do objeto promovido sem uniao
+//	criterio3: menor distancia entre o objeto a ser inserido e o promovido
+//	else: insere no novo
+//	)
 
 	// Distributing keys
 	for (i = 0; i < total; i++) {
@@ -600,9 +653,6 @@ RTreePromotion<K> * RTree<K>::splitLeaf(Session * se, RTreeLeaf<K> * fullLeaf, R
 					}
 				}
 			}
-			// clear home
-			delete union1;
-			delete union2;
 		}
 	}
 
@@ -618,13 +668,16 @@ RTreePromotion<K> * RTree<K>::splitLeaf(Session * se, RTreeLeaf<K> * fullLeaf, R
 	} else {
 		fullLeaf->writePreviousPageId(newLeaf->getPageId());
 	}
-	// clear home
-	for (i = 0; i < total; i++) {
+	// clear home (vecKey[total-1] and vecUuid[total-1] are parameters)
+	for (i = 0; i < total - 1 ; i++) {
 		delete vecKey[i];
 		delete vecUuid[i];
 	}//endfor
 	delete [] vecUuid;
 	delete [] vecKey;
+	//clean home
+    delete [] serialRep1;
+    delete [] serialRep2;
 	return objPromote;
 
 

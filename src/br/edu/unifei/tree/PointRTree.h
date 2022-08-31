@@ -12,6 +12,7 @@
 
 #include <br/edu/unifei/tree/Types.h>
 
+#include <br/edu/unifei/tree/EuclideanGeometry.h>
 #include <br/edu/unifei/tree/Rectangle.h>
 #include <br/edu/unifei/tree/Uuid.h>
 #include <type_traits>
@@ -32,6 +33,8 @@ private:
 	Float latitude;
 	Float longitude;
 	Double preservedDistance;
+
+	EuclideanGeometry<PointRTree> * geometry;
 
 public:
 	PointRTree();
