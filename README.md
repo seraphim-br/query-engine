@@ -1,5 +1,5 @@
 # Query Engine
-Um motor de consultas leve, extensível e eficiente para análise, filtragem e execução de queries.
+Um motor de consultas leve, extensível e eficiente para execução em estrutura de dados.
 
 ## 📋 Sobre o Projeto
 
